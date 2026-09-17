@@ -1,0 +1,34 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+.venv/
+venv/
+env/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- Docker ---
+docker-compose.override.yml
+
+# --- SQLite ---
+*.db
+*.sqlite
+*.sqlite3
+/data/*.db
+
+# --- Secrets / environment ---
+.env
+.env.*
+!.env.example
+
+# --- Editor / OS ---
+.DS_Store
+.idea/
+.vscode/
+*.swp

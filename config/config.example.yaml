@@ -1,0 +1,106 @@
+# =============================================================================
+# OpenMRS Trust Bot — Service Configuration
+#
+# This is an annotated EXAMPLE. Copy this file to /config/config.yaml on the
+# host (mounted into the container at /config/config.yaml) and adjust values
+# for your environment. This file is loaded once at service startup;
+# changes require a container restart. Secrets are never stored here — see
+# .env.example for the environment variables this file references.
+#
+# See openspec/specs/config-schema.md for the full schema reference.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Discourse integration
+# -----------------------------------------------------------------------------
+discourse:
+  base_url: "https://talk.openmrs.org"
+
+  webhook:
+    # Duration (in seconds) within which a webhook payload timestamp must fall
+    # to be accepted. Payloads outside this window are rejected as potential
+    # replays. Overridable via DISCOURSE_REPLAY_WINDOW_SECONDS.
+    replay_window_seconds: 300       # default: 5 minutes
+
+  # Discourse API credentials are supplied via environment variables:
+  #   DISCOURSE_API_KEY
+  #   DISCOURSE_API_USERNAME
+
+# -----------------------------------------------------------------------------
+# Keycloak integration
+# -----------------------------------------------------------------------------
+keycloak:
+  base_url: "https://id-new.openmrs.org"
+  realm: "OpenMRS"
+
+  retry:
+    # Number of additional attempts after the first failure before giving up
+    max_retries: 1
+    # Seconds to wait between attempts
+    retry_delay_seconds: 2
+
+  # Keycloak service account credentials are supplied via environment variables:
+  #   KEYCLOAK_CLIENT_ID
+  #   KEYCLOAK_CLIENT_SECRET
+
+# -----------------------------------------------------------------------------
+# Slack integration
+# -----------------------------------------------------------------------------
+slack:
+  # The private channel ID from which trust commands are accepted.
+  # Commands issued from any other channel are rejected.
+  trusted_channel_id: "C0123456789"
+
+  # Slack app credentials are supplied via environment variables:
+  #   SLACK_BOT_TOKEN
+  #   SLACK_SIGNING_SECRET
+
+# -----------------------------------------------------------------------------
+# Rate limiting
+# -----------------------------------------------------------------------------
+rate_limiting:
+  # Discourse webhook endpoint: max requests per window per source IP
+  discourse_webhook:
+    max_requests: 60
+    window_seconds: 60
+
+  # Slack commands: max commands per window per Slack user
+  slack_commands:
+    max_requests: 10
+    window_seconds: 60
+
+# -----------------------------------------------------------------------------
+# Logging
+# -----------------------------------------------------------------------------
+logging:
+  # Application log level: DEBUG | INFO | WARNING | ERROR
+  # Can also be set or overridden via LOG_LEVEL environment variable.
+  # Can be changed at runtime via the admin API without restarting.
+  level: "INFO"
+
+  # Format for log output. 'json' recommended for production (Docker log
+  # aggregation); 'text' may be easier for local development.
+  format: "json"    # json | text
+
+# -----------------------------------------------------------------------------
+# Database
+# -----------------------------------------------------------------------------
+database:
+  # Path inside the container to the SQLite audit database.
+  # Should be within the host-mounted /data/ volume.
+  path: "/data/audit.db"
+
+# -----------------------------------------------------------------------------
+# Admin API
+# (Exposes health check and runtime log level control)
+# -----------------------------------------------------------------------------
+admin:
+  # Port the FastAPI service listens on
+  port: 8080
+
+  # Whether to require authentication on admin endpoints.
+  # Always set to true in production.
+  require_auth: true
+
+  # Admin API credentials are supplied via environment variables:
+  #   ADMIN_API_TOKEN

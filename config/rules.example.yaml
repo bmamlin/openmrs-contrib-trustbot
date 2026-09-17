@@ -1,0 +1,66 @@
+# =============================================================================
+# OpenMRS Trust Bot — Rules Configuration
+#
+# This is an annotated EXAMPLE. Copy this file to /config/rules.yaml on the
+# host (mounted into the container at /config/rules.yaml) and adjust as
+# needed. Rules are evaluated on every trigger event. Each rule specifies:
+#   - One or more triggers (what causes this rule to fire)
+#   - One or more actions (what happens when it fires)
+#
+# rules.yaml is re-read from disk on every trigger event, so rule changes
+# take effect immediately without restarting the service.
+# Note: config.yaml changes (URLs, rate limits, etc.) require a container restart.
+#
+# A rule fires when ANY of its listed triggers matches the incoming event
+# (OR logic). AND logic (requiring multiple conditions to be true simultaneously)
+# is not supported in the MVP but is a noted future extension point (see
+# openspec/specs/config-schema.md).
+# =============================================================================
+
+rules:
+
+  # ---------------------------------------------------------------------------
+  # Automatically grant community edit access when a user reaches
+  # Discourse Trust Level 2.
+  # ---------------------------------------------------------------------------
+  - name: "Grant community edit access (Discourse TL2)"
+    enabled: true
+    triggers:
+      - type: discourse_trust_level
+        threshold: 2              # fires when trust level reaches exactly this value
+                                  # (not on every event at or above threshold —
+                                  # idempotency in the action handles re-runs)
+    actions:
+      - type: keycloak_add_groups
+        groups:
+          - jira-users
+          - jira-trunk-developer
+          - confluence-users
+
+  # ---------------------------------------------------------------------------
+  # Manually grant community edit access via Slack /trust command.
+  # ---------------------------------------------------------------------------
+  - name: "Grant community edit access (manual /trust)"
+    enabled: true
+    triggers:
+      - type: slack_trust_command
+    actions:
+      - type: keycloak_add_groups
+        groups:
+          - jira-users
+          - jira-trunk-developer
+          - confluence-users
+
+  # ---------------------------------------------------------------------------
+  # Manually revoke community edit access via Slack /revoke command.
+  # ---------------------------------------------------------------------------
+  - name: "Revoke community edit access (manual /revoke)"
+    enabled: true
+    triggers:
+      - type: slack_revoke_command
+    actions:
+      - type: keycloak_remove_groups
+        groups:
+          - jira-users
+          - jira-trunk-developer
+          - confluence-users

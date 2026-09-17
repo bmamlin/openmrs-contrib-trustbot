@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+slack-bolt
+python-keycloak
+pydiscourse
+pyyaml
