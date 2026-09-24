@@ -10,16 +10,43 @@ membership is always queried live from Keycloak — never cached.
 
 from __future__ import annotations
 
-from typing import Any
+import json
 
-from src.engine.models import Action
+from keycloak.exceptions import KeycloakConnectionError
+
+from src.engine.models import Action, ActionResult, TriggerEvent
+from src.integrations import keycloak as keycloak_integration
+from src.integrations.keycloak import UserNotFoundError
 
 
-def add_groups(action: Action, openmrs_id: str) -> Any:
-    """Add openmrs_id to the groups listed in the action; idempotent."""
-    raise NotImplementedError
+def add_groups(action: Action, event: TriggerEvent) -> ActionResult:
+    """Add event.openmrs_id to the groups listed in the action; idempotent."""
+    client = keycloak_integration.get_client()
+    groups: list[str] = action.groups
+
+    try:
+        added = client.add_user_to_groups(event.openmrs_id, groups)
+    except UserNotFoundError as exc:
+        return ActionResult(status="failure", detail=str(exc))
+    except KeycloakConnectionError:
+        return ActionResult(
+            status="failure",
+            detail="Unable to reach Keycloak. Please try again later.",
+        )
+
+    if not added:
+        return ActionResult(
+            status="no_change",
+            detail=f"'{event.openmrs_id}' is already a member of: {', '.join(groups)}",
+        )
+
+    return ActionResult(
+        status="success",
+        detail=f"Added '{event.openmrs_id}' to: {', '.join(added)}",
+        action_detail=json.dumps(added),
+    )
 
 
-def remove_groups(action: Action, openmrs_id: str) -> Any:
-    """Remove openmrs_id from the groups listed in the action; idempotent."""
+def remove_groups(action: Action, event: TriggerEvent) -> ActionResult:
+    """Remove event.openmrs_id from the groups listed in the action; idempotent."""
     raise NotImplementedError

@@ -27,6 +27,12 @@ docker-compose.override.yml
 .env.*
 !.env.example
 
+# --- Live config (host-mounted in production, per-environment locally) ---
+# Only the annotated .example templates are committed; see
+# openspec/specs/repository-plan.md "Config vs. Data volumes".
+/config/config.yaml
+/config/rules.yaml
+
 # --- Editor / OS ---
 .DS_Store
 .idea/

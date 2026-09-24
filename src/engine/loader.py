@@ -8,17 +8,26 @@ at startup elsewhere (not in this module).
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
+
+import yaml
 
 from src.engine.models import RuleSet
 
-DEFAULT_RULES_PATH = Path("/config/rules.yaml")
+
+def default_rules_path() -> Path:
+    """The rules.yaml path to use when none is given: $RULES_PATH, else /config/rules.yaml."""
+    return Path(os.environ.get("RULES_PATH", "/config/rules.yaml"))
 
 
-def load_rules(path: Path = DEFAULT_RULES_PATH) -> RuleSet:
+def load_rules(path: Path | str | None = None) -> RuleSet:
     """Read and parse rules.yaml from disk, returning a validated RuleSet.
 
     Intended to be called fresh on every trigger event (see module
-    docstring) rather than cached, so config edits take effect immediately.
+    docstring) rather than cached, so rule edits take effect immediately.
     """
-    raise NotImplementedError
+    resolved = Path(path) if path is not None else default_rules_path()
+    with open(resolved) as f:
+        raw = yaml.safe_load(f)
+    return RuleSet.model_validate(raw)

@@ -40,17 +40,27 @@ but the spec itself is authoritative.
 ## Layout
 
 ```
-src/engine/        rules engine core: models (Pydantic), loader (rules.yaml), evaluator
+src/config.py       loads config.yaml once at startup (ServiceConfig, Pydantic)
+src/engine/         rules engine core: models (Pydantic), loader (rules.yaml), evaluator
 src/triggers/       one module per trigger type (discourse_trust_level, slack_trust_command, ...)
 src/actions/        one module per action type (keycloak_add_groups, keycloak_remove_groups)
 src/integrations/   external API clients (Keycloak, Discourse, Slack)
 src/audit/          SQLite audit log (schema.sql + db.py)
 src/api/            FastAPI routers (health, webhooks, admin)
 config/             example config.yaml / rules.yaml (committed; live copies are host-mounted, gitignored)
-tests/unit/         one test module per engine/trigger/action module
+tests/unit/         one test module per engine/trigger/action/integration module
 tests/integration/  end-to-end rule evaluation pipeline
 tests/security/     unauthorized channel, malformed/unsigned payloads, replay attacks, rate limiting
 ```
+
+Trigger/action `type` strings (e.g. `"slack_trust_command"`,
+`"keycloak_add_groups"`) are dispatched through registries in
+`src/engine/evaluator.py` (`TRIGGER_MATCHERS`, `ACTION_EXECUTORS`),
+populated by `src/triggers/register_all()` and `src/actions/register_all()`
+— see those modules' docstrings and `openspec/changes/add-slack-trust-grant/design.md`
+for the mechanism. A trigger type referenced in `rules.yaml` but not yet
+registered simply never matches, rather than erroring, so `rules.yaml` can
+reference not-yet-implemented trigger types.
 
 ## Conventions
 
@@ -81,8 +91,11 @@ pytest
 
 ## Current state
 
-Repository scaffolding only. Engine/trigger/action/integration modules are
-stubs (raise `NotImplementedError`) with docstrings describing intended
-behavior per the spec. `GET /health` is the one fully implemented
-endpoint. See the spec's Functional Requirements (§5) checklists for what
-remains to be built.
+The rules engine core, the Slack `/trust` command, the `keycloak_add_groups`
+action, and the audit log are implemented and tested (see
+`openspec/changes/add-slack-trust-grant/`) — `/trust <openmrs-id>` in the
+configured Slack channel grants Keycloak group access end-to-end. `/revoke`,
+`/trust-status`, the Discourse webhook trigger, rate limiting, the admin
+log-level API, and dry-run mode remain stubs (`NotImplementedError`) with
+docstrings describing intended behavior per the spec. See the spec's
+Functional Requirements (§5) checklists for what remains to be built.
