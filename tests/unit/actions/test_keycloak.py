@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 import pytest
 from keycloak.exceptions import KeycloakConnectionError
 
-from src.actions.keycloak import add_groups
+from src.actions.keycloak import add_groups, remove_groups
 from src.engine.models import Action, TriggerEvent
 from src.integrations import keycloak as keycloak_integration
 from src.integrations.keycloak import UserNotFoundError
@@ -21,6 +21,10 @@ def make_event(openmrs_id="jdoe"):
 
 def make_action(groups=("jira-users", "jira-trunk-developer", "confluence-users")):
     return Action(type="keycloak_add_groups", groups=list(groups))
+
+
+def make_revoke_action(groups=("jira-users", "jira-trunk-developer", "confluence-users")):
+    return Action(type="keycloak_remove_groups", groups=list(groups))
 
 
 def test_add_groups_success_when_groups_are_missing():
@@ -62,6 +66,50 @@ def test_add_groups_failure_when_keycloak_unreachable():
     keycloak_integration.set_client(client)
 
     result = add_groups(make_action(), make_event())
+
+    assert result.status == "failure"
+    assert "Unable to reach Keycloak" in result.detail
+
+
+def test_remove_groups_success_when_groups_are_present():
+    client = MagicMock()
+    client.remove_user_from_groups.return_value = ["jira-users", "confluence-users"]
+    keycloak_integration.set_client(client)
+
+    result = remove_groups(make_revoke_action(), make_event())
+
+    assert result.status == "success"
+    assert "jira-users" in result.action_detail
+
+
+def test_remove_groups_no_change_when_not_a_member():
+    client = MagicMock()
+    client.remove_user_from_groups.return_value = []
+    keycloak_integration.set_client(client)
+
+    result = remove_groups(make_revoke_action(), make_event())
+
+    assert result.status == "no_change"
+    assert "jdoe" in result.detail
+
+
+def test_remove_groups_failure_when_user_not_found():
+    client = MagicMock()
+    client.remove_user_from_groups.side_effect = UserNotFoundError("nobody")
+    keycloak_integration.set_client(client)
+
+    result = remove_groups(make_revoke_action(), make_event(openmrs_id="nobody"))
+
+    assert result.status == "failure"
+    assert "nobody" in result.detail
+
+
+def test_remove_groups_failure_when_keycloak_unreachable():
+    client = MagicMock()
+    client.remove_user_from_groups.side_effect = KeycloakConnectionError("down")
+    keycloak_integration.set_client(client)
+
+    result = remove_groups(make_revoke_action(), make_event())
 
     assert result.status == "failure"
     assert "Unable to reach Keycloak" in result.detail

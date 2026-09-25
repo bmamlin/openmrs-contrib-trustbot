@@ -5,7 +5,9 @@ from src.engine.models import Action, ActionResult, Rule, RuleSet, Trigger, Trig
 
 def test_registries_are_populated_on_import():
     assert "slack_trust_command" in evaluator.TRIGGER_MATCHERS
+    assert "slack_revoke_command" in evaluator.TRIGGER_MATCHERS
     assert "keycloak_add_groups" in evaluator.ACTION_EXECUTORS
+    assert "keycloak_remove_groups" in evaluator.ACTION_EXECUTORS
 
 
 def make_rule(name, trigger_types, *, enabled=True, action_type="keycloak_add_groups"):

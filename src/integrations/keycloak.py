@@ -97,8 +97,25 @@ class KeycloakClient:
             added.append(group_name)
         return added
 
-    def remove_user_from_groups(self, openmrs_id: str, groups: list[str]) -> None:
-        raise NotImplementedError
+    def remove_user_from_groups(self, openmrs_id: str, groups: list[str]) -> list[str]:
+        """Remove openmrs_id from each of `groups` it is currently in.
+
+        Idempotent: groups the user doesn't have are left alone (not an
+        error). Returns the list of group names actually removed (empty
+        if the user held none of them). Raises UserNotFoundError if
+        openmrs_id doesn't exist.
+        """
+        user_id = self._require_user_id(openmrs_id)
+        current = set(self._group_names_for_user_id(user_id))
+
+        removed: list[str] = []
+        for group_name in groups:
+            if group_name not in current:
+                continue
+            group = self._call_with_retry(self._admin.get_group_by_path, f"/{group_name}")
+            self._call_with_retry(self._admin.group_user_remove, user_id, group["id"])
+            removed.append(group_name)
+        return removed
 
 
 _client: KeycloakClient | None = None

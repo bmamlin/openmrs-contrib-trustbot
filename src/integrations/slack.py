@@ -1,13 +1,14 @@
 """Slack client/app setup (built on slack-bolt).
 
-Registers the `/trust` slash command (`/revoke` and `/trust-status` are out
-of scope for this change) and relies on slack-bolt's own signature
+Registers the `/trust` and `/revoke` slash commands (`/trust-status` is
+out of scope for this change) and relies on slack-bolt's own signature
 verification (SLACK_SIGNING_SECRET, checked by the App/SlackRequestHandler
-before any listener runs — see design.md) and posting responses back to
-Slack (SLACK_BOT_TOKEN). Channel-restriction enforcement and TriggerEvent
-construction live in src/triggers/slack.py; rule loading and dispatch live
-in src/engine/loader.py and src/engine/evaluator.py. This module wires
-those together behind the `/trust` command listener.
+before any listener runs — see the add-slack-trust-grant design.md) and
+posting responses back to Slack (SLACK_BOT_TOKEN). Channel-restriction
+enforcement and TriggerEvent construction live in src/triggers/slack.py;
+rule loading and dispatch live in src/engine/loader.py and
+src/engine/evaluator.py. This module wires those together behind the
+`/trust` and `/revoke` command listeners.
 """
 
 from __future__ import annotations
@@ -21,7 +22,7 @@ from slack_bolt import App
 from src.engine import evaluator
 from src.engine.loader import load_rules
 from src.engine.models import ActionResult
-from src.triggers.slack import build_trust_event
+from src.triggers.slack import build_revoke_event, build_trust_event
 
 
 @dataclass
@@ -58,6 +59,11 @@ def create_slack_app(
         ack()
         _handle_trust(command, context, respond)
 
+    @app.command("/revoke")
+    def handle_revoke_command(ack, command, respond) -> None:
+        ack()  # same silent-rejection rationale as /trust, see above
+        _handle_revoke(command, context, respond)
+
     return app
 
 
@@ -93,3 +99,37 @@ def _format_response(openmrs_id: str, outcomes: Sequence[ActionResult]) -> str:
         return f"`{openmrs_id}` is already trusted."
 
     return f"`{openmrs_id}` has been granted community edit access."
+
+
+def _handle_revoke(command: dict, context: SlackContext, respond) -> None:
+    event = build_revoke_event(command, trusted_channel_id=context.trusted_channel_id)
+    if event is None:
+        return  # wrong channel: silent rejection, no response (see build_revoke_event)
+
+    if not event.openmrs_id:
+        respond("Usage: `/revoke <openmrs-id>`")
+        return
+
+    rule_set = load_rules()
+    matched_rules = evaluator.evaluate(rule_set, event)
+
+    if not matched_rules:
+        respond(f"No rule is configured to handle `/revoke` for `{event.openmrs_id}`.")
+        return
+
+    outcomes: list[ActionResult] = []
+    for rule in matched_rules:
+        outcomes.extend(evaluator.execute_rule(rule, event, conn=context.audit_conn))
+
+    respond(_format_revoke_response(event.openmrs_id, outcomes))
+
+
+def _format_revoke_response(openmrs_id: str, outcomes: Sequence[ActionResult]) -> str:
+    failures = [o for o in outcomes if o.status == "failure"]
+    if failures:
+        return f"Could not revoke access for `{openmrs_id}`: {failures[0].detail}"
+
+    if all(o.status == "no_change" for o in outcomes):
+        return f"`{openmrs_id}` is already not trusted."
+
+    return f"`{openmrs_id}` has had community edit access revoked."

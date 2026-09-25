@@ -57,7 +57,8 @@ Trigger/action `type` strings (e.g. `"slack_trust_command"`,
 `"keycloak_add_groups"`) are dispatched through registries in
 `src/engine/evaluator.py` (`TRIGGER_MATCHERS`, `ACTION_EXECUTORS`),
 populated by `src/triggers/register_all()` and `src/actions/register_all()`
-— see those modules' docstrings and `openspec/changes/add-slack-trust-grant/design.md`
+— see those modules' docstrings and
+`openspec/changes/archive/2026-09-24-add-slack-trust-grant/design.md`
 for the mechanism. A trigger type referenced in `rules.yaml` but not yet
 registered simply never matches, rather than erroring, so `rules.yaml` can
 reference not-yet-implemented trigger types.
@@ -91,11 +92,12 @@ pytest
 
 ## Current state
 
-The rules engine core, the Slack `/trust` command, the `keycloak_add_groups`
-action, and the audit log are implemented and tested (see
-`openspec/changes/add-slack-trust-grant/`) — `/trust <openmrs-id>` in the
-configured Slack channel grants Keycloak group access end-to-end. `/revoke`,
-`/trust-status`, the Discourse webhook trigger, rate limiting, the admin
-log-level API, and dry-run mode remain stubs (`NotImplementedError`) with
-docstrings describing intended behavior per the spec. See the spec's
-Functional Requirements (§5) checklists for what remains to be built.
+The rules engine core, the Slack `/trust` and `/revoke` commands, the
+`keycloak_add_groups` / `keycloak_remove_groups` actions, and the audit log
+are implemented and tested (see `openspec/changes/archive/`) —
+`/trust <openmrs-id>` and `/revoke <openmrs-id>` in the configured Slack
+channel grant/revoke Keycloak group access end-to-end. `/trust-status`,
+the Discourse webhook trigger, rate limiting, the admin log-level API, and
+dry-run mode remain stubs (`NotImplementedError`) with docstrings
+describing intended behavior per the spec. See the spec's Functional
+Requirements (§5) checklists for what remains to be built.

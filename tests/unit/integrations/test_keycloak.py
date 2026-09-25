@@ -82,6 +82,55 @@ def test_add_user_to_groups_retries_once_on_connection_error_then_succeeds(clien
     assert added == ["jira-users"]
 
 
+def test_remove_user_from_groups_only_removes_groups_user_has(client):
+    with (
+        patch.object(client._admin, "get_user_id", return_value="uid-1"),
+        patch.object(
+            client._admin,
+            "get_user_groups",
+            return_value=[{"name": "jira-users"}, {"name": "confluence-users"}],
+        ),
+        patch.object(
+            client._admin,
+            "get_group_by_path",
+            return_value={"id": "gid-jira"},
+        ) as get_group_by_path,
+        patch.object(client._admin, "group_user_remove") as group_user_remove,
+    ):
+        removed = client.remove_user_from_groups(
+            "jdoe", ["jira-users", "jira-trunk-developer", "confluence-users"]
+        )
+
+    # jira-trunk-developer isn't in current membership, so it's skipped.
+    assert set(removed) == {"jira-users", "confluence-users"}
+    assert group_user_remove.call_count == 2
+    get_group_by_path.assert_any_call("/jira-users")
+    get_group_by_path.assert_any_call("/confluence-users")
+
+
+def test_remove_user_from_groups_retries_once_on_connection_error_then_succeeds(client):
+    call_count = {"n": 0}
+
+    def flaky_get_user_id(_openmrs_id):
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            raise KeycloakConnectionError("connection refused")
+        return "uid-1"
+
+    with (
+        patch.object(client._admin, "get_user_id", side_effect=flaky_get_user_id),
+        patch.object(
+            client._admin, "get_user_groups", return_value=[{"name": "jira-users"}]
+        ),
+        patch.object(client._admin, "get_group_by_path", return_value={"id": "gid"}),
+        patch.object(client._admin, "group_user_remove"),
+    ):
+        removed = client.remove_user_from_groups("jdoe", ["jira-users"])
+
+    assert call_count["n"] == 2
+    assert removed == ["jira-users"]
+
+
 def test_raises_after_retry_exhausted_on_persistent_connection_error(client):
     with patch.object(
         client._admin, "get_user_id", side_effect=KeycloakConnectionError("down")

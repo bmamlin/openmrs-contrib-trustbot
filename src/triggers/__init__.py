@@ -16,3 +16,4 @@ def register_all() -> None:
     from src.triggers import slack
 
     register_trigger("slack_trust_command", slack.matches_trust)
+    register_trigger("slack_revoke_command", slack.matches_revoke)

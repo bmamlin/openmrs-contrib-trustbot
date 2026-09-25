@@ -9,8 +9,6 @@ check belongs here, not further downstream.
 
 from __future__ import annotations
 
-from typing import Any
-
 from src.engine.models import Trigger, TriggerEvent
 
 
@@ -25,9 +23,13 @@ def matches_trust(trigger: Trigger, event: TriggerEvent) -> bool:
     return trigger.type == "slack_trust_command" and event.type == "slack_trust_command"
 
 
-def matches_revoke(trigger: Trigger, event: Any) -> bool:
-    """Return True if a slack_revoke_command trigger matches the given event."""
-    raise NotImplementedError
+def matches_revoke(trigger: Trigger, event: TriggerEvent) -> bool:
+    """Return True if a slack_revoke_command trigger matches the given event.
+
+    Mirrors matches_trust(): no extra per-rule fields on this trigger in
+    the MVP schema, so this is just a type check.
+    """
+    return trigger.type == "slack_revoke_command" and event.type == "slack_revoke_command"
 
 
 def build_trust_event(command: dict, *, trusted_channel_id: str) -> TriggerEvent | None:
@@ -44,6 +46,25 @@ def build_trust_event(command: dict, *, trusted_channel_id: str) -> TriggerEvent
     openmrs_id = (command.get("text") or "").strip()
     return TriggerEvent(
         type="slack_trust_command",
+        openmrs_id=openmrs_id,
+        source=command.get("user_name"),
+        payload={"channel_id": command.get("channel_id")},
+    )
+
+
+def build_revoke_event(command: dict, *, trusted_channel_id: str) -> TriggerEvent | None:
+    """Build a slack_revoke_command TriggerEvent from a Slack `/revoke` command payload.
+
+    Mirrors build_trust_event(): same channel-restriction check, same
+    silent-rejection behavior for commands from outside the trusted
+    channel.
+    """
+    if command.get("channel_id") != trusted_channel_id:
+        return None
+
+    openmrs_id = (command.get("text") or "").strip()
+    return TriggerEvent(
+        type="slack_revoke_command",
         openmrs_id=openmrs_id,
         source=command.get("user_name"),
         payload={"channel_id": command.get("channel_id")},

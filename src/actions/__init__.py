@@ -13,3 +13,4 @@ def register_all() -> None:
     from src.engine.evaluator import register_action
 
     register_action("keycloak_add_groups", keycloak.add_groups)
+    register_action("keycloak_remove_groups", keycloak.remove_groups)
