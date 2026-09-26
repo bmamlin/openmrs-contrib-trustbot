@@ -22,6 +22,7 @@ from slack_bolt.adapter.fastapi import SlackRequestHandler
 from src.api import admin, health, webhooks
 from src.audit.db import get_connection
 from src.config import load_config
+from src.integrations import discourse as discourse_integration
 from src.integrations import keycloak as keycloak_integration
 from src.integrations.slack import create_slack_app
 
@@ -46,6 +47,14 @@ keycloak_client = keycloak_integration.build_client(
 )
 keycloak_integration.set_client(keycloak_client)
 app.state.keycloak_client = keycloak_client
+
+discourse_client = discourse_integration.build_client(
+    config.discourse.base_url,
+    os.environ["DISCOURSE_API_KEY"],
+    os.environ["DISCOURSE_API_USERNAME"],
+)
+discourse_integration.set_client(discourse_client)
+app.state.discourse_client = discourse_client
 
 slack_app = create_slack_app(
     os.environ["SLACK_BOT_TOKEN"],

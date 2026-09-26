@@ -1,8 +1,9 @@
-"""Security-focused tests for the /trust command's authorization checks.
+"""Security-focused tests for the /trust-status command's authorization checks.
 
-Per the slack-trust-command spec: signature verification happens before
-anything else, and a command from outside the trusted channel is rejected
-silently (no rule-engine action, no visible response).
+Mirrors test_slack_trust_command.py. Per the slack-trust-status-command
+spec: signature verification happens before anything else, and a command
+from outside the trusted channel is rejected silently (no lookups, no
+visible response).
 """
 
 import hashlib
@@ -16,6 +17,7 @@ from urllib.parse import urlencode
 import pytest
 from fastapi.testclient import TestClient
 
+from src.integrations import discourse as discourse_integration
 from src.integrations import keycloak as keycloak_integration
 
 SIGNING_SECRET = "test-signing-secret"
@@ -64,13 +66,16 @@ def app_client(tmp_path, monkeypatch):
 
     sys.modules.pop("src.main", None)
     keycloak_integration._client = None
+    discourse_integration._client = None
 
 
 @pytest.fixture
-def mock_keycloak_client():
-    client = MagicMock()
-    keycloak_integration.set_client(client)
-    return client
+def mock_clients():
+    keycloak_client = MagicMock()
+    keycloak_integration.set_client(keycloak_client)
+    discourse_client = MagicMock()
+    discourse_integration.set_client(discourse_client)
+    return keycloak_client, discourse_client
 
 
 def slack_command_body(*, channel_id: str, text: str = "jdoe", user_name: str = "alice") -> str:
@@ -81,7 +86,7 @@ def slack_command_body(*, channel_id: str, text: str = "jdoe", user_name: str = 
             "channel_id": channel_id,
             "user_id": "U0123456789",
             "user_name": user_name,
-            "command": "/trust",
+            "command": "/trust-status",
             "text": text,
             "response_url": "https://hooks.slack.com/commands/T0123456789/000/xxx",
             "trigger_id": "000.000.abc",
@@ -107,22 +112,20 @@ def post_command(client: TestClient, body: str, *, signature: str, timestamp: st
     )
 
 
-def test_invalid_signature_is_rejected_before_any_processing(app_client, mock_keycloak_client):
+def test_invalid_signature_is_rejected_before_any_processing(app_client, mock_clients):
+    keycloak_client, discourse_client = mock_clients
     body = slack_command_body(channel_id=TRUSTED_CHANNEL)
     timestamp = str(int(time.time()))
 
     response = post_command(app_client, body, signature="v0=not-a-real-signature", timestamp=timestamp)
 
     assert response.status_code == 401
-    mock_keycloak_client.add_user_to_groups.assert_not_called()
-
-    conn = app_client.app.state.audit_conn
-    assert conn.execute("SELECT COUNT(*) FROM audit_log").fetchone()[0] == 0
+    keycloak_client.get_user_groups.assert_not_called()
+    discourse_client.get_trust_level.assert_not_called()
 
 
-def test_valid_signature_from_unauthorized_channel_is_silently_rejected(
-    app_client, mock_keycloak_client
-):
+def test_valid_signature_from_unauthorized_channel_is_silently_rejected(app_client, mock_clients):
+    keycloak_client, discourse_client = mock_clients
     body = slack_command_body(channel_id="C_SOME_OTHER_CHANNEL")
     timestamp = str(int(time.time()))
     signature = sign(body, timestamp)
@@ -130,8 +133,6 @@ def test_valid_signature_from_unauthorized_channel_is_silently_rejected(
     response = post_command(app_client, body, signature=signature, timestamp=timestamp)
 
     assert response.status_code == 200
-    # No visible Slack message and no rule-engine action for the wrong channel.
-    mock_keycloak_client.add_user_to_groups.assert_not_called()
-
-    conn = app_client.app.state.audit_conn
-    assert conn.execute("SELECT COUNT(*) FROM audit_log").fetchone()[0] == 0
+    # No visible Slack message and no lookups for the wrong channel.
+    keycloak_client.get_user_groups.assert_not_called()
+    discourse_client.get_trust_level.assert_not_called()

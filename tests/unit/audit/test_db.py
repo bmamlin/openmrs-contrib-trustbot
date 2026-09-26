@@ -2,7 +2,7 @@ import threading
 
 import pytest
 
-from src.audit.db import get_connection, record_event
+from src.audit.db import get_connection, get_recent_events, record_event
 
 
 @pytest.fixture
@@ -84,6 +84,30 @@ def test_record_event_works_from_a_different_thread_than_the_connection_was_open
 
     assert errors == []
     assert conn.execute("SELECT COUNT(*) FROM audit_log").fetchone()[0] == 1
+
+
+def test_get_recent_events_returns_only_that_users_rows_newest_first(conn):
+    for openmrs_id, action_detail in [
+        ("jdoe", "first"),
+        ("other-user", "should-not-appear"),
+        ("jdoe", "second"),
+        ("jdoe", "third"),
+    ]:
+        record_event(
+            conn,
+            openmrs_id=openmrs_id,
+            trigger="slack_trust_command",
+            trigger_src="alice",
+            rule_name="rule",
+            action="keycloak_add_groups",
+            action_detail=action_detail,
+            status="success",
+            detail=None,
+        )
+
+    events = get_recent_events(conn, "jdoe", limit=2)
+
+    assert [e["action_detail"] for e in events] == ["third", "second"]
 
 
 def test_record_event_rejects_unknown_status(conn):

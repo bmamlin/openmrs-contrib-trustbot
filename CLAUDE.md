@@ -92,12 +92,15 @@ pytest
 
 ## Current state
 
-The rules engine core, the Slack `/trust` and `/revoke` commands, the
-`keycloak_add_groups` / `keycloak_remove_groups` actions, and the audit log
-are implemented and tested (see `openspec/changes/archive/`) —
-`/trust <openmrs-id>` and `/revoke <openmrs-id>` in the configured Slack
-channel grant/revoke Keycloak group access end-to-end. `/trust-status`,
-the Discourse webhook trigger, rate limiting, the admin log-level API, and
-dry-run mode remain stubs (`NotImplementedError`) with docstrings
-describing intended behavior per the spec. See the spec's Functional
-Requirements (§5) checklists for what remains to be built.
+The rules engine core, the Slack `/trust`, `/revoke`, and `/trust-status`
+commands, the `keycloak_add_groups` / `keycloak_remove_groups` actions, and
+the audit log are implemented and tested (see `openspec/changes/archive/`)
+— `/trust <openmrs-id>` and `/revoke <openmrs-id>` in the configured Slack
+channel grant/revoke Keycloak group access end-to-end, and
+`/trust-status <openmrs-id>` reports current Keycloak groups, Discourse
+trust level, and recent audit history (read-only — it never reaches the
+rules engine, and degrades gracefully per-section if one data source is
+unavailable). The Discourse webhook trigger, rate limiting, the admin
+log-level API, and dry-run mode remain stubs (`NotImplementedError`) with
+docstrings describing intended behavior per the spec. See the spec's
+Functional Requirements (§5) checklists for what remains to be built.

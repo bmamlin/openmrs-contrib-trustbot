@@ -72,3 +72,22 @@ def record_event(
         ),
     )
     conn.commit()
+
+
+def get_recent_events(conn: sqlite3.Connection, openmrs_id: str, *, limit: int = 5) -> list[dict]:
+    """Return openmrs_id's most recent audit_log rows, newest first.
+
+    Read-only; does not affect the append-only write path above.
+    """
+    cursor = conn.execute(
+        """
+        SELECT timestamp, trigger, trigger_src, rule_name, action, action_detail, status, detail
+        FROM audit_log
+        WHERE openmrs_id = ?
+        ORDER BY id DESC
+        LIMIT ?
+        """,
+        (openmrs_id, limit),
+    )
+    columns = [description[0] for description in cursor.description]
+    return [dict(zip(columns, row)) for row in cursor.fetchall()]

@@ -46,6 +46,8 @@ def app_client(tmp_path, monkeypatch):
     monkeypatch.setenv("KEYCLOAK_CLIENT_SECRET", "dummy-client-secret")
     monkeypatch.setenv("SLACK_BOT_TOKEN", "xoxb-dummy-token")
     monkeypatch.setenv("SLACK_SIGNING_SECRET", "dummy-signing-secret")
+    monkeypatch.setenv("DISCOURSE_API_KEY", "dummy-discourse-api-key")
+    monkeypatch.setenv("DISCOURSE_API_USERNAME", "dummy-discourse-api-username")
 
     sys.modules.pop("src.main", None)
     main = importlib.import_module("src.main")
