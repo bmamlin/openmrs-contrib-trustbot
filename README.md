@@ -134,7 +134,7 @@ instance itself (e.g. `talk.openmrs.org`), to call the service's
 2. Pick a secret for that Code step's HMAC key — this is the value
    you'll set as `DISCOURSE_WORKFLOW_SECRET` below.
 
-See [the add-discourse-trust-level-trigger design doc](openspec/changes/add-discourse-trust-level-trigger/design.md)
+See [the add-discourse-trust-level-trigger design doc](openspec/changes/archive/2026-10-02-add-discourse-trust-level-trigger/design.md)
 for the full rationale and exact payload/header shape this service expects.
 
 ### Prepare test environment
