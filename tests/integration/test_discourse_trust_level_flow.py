@@ -20,6 +20,7 @@ from fastapi.testclient import TestClient
 from src.api.webhooks import create_webhooks_router
 from src.audit.db import get_connection
 from src.integrations import keycloak as keycloak_integration
+from src.ratelimit import RateLimiter
 
 EXAMPLE_RULES = Path(__file__).parents[2] / "config" / "rules.example.yaml"
 WEBHOOK_SECRET = "test-webhook-secret"
@@ -47,6 +48,7 @@ def client(tmp_path):
         workflow_name=WORKFLOW_NAME,
         discourse_base_url=DISCOURSE_BASE_URL,
         audit_conn=conn,
+        rate_limiter=RateLimiter(max_requests=1000, window_seconds=60),
     )
     app = FastAPI()
     app.include_router(router)

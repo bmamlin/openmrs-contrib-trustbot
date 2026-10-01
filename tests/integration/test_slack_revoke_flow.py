@@ -99,3 +99,13 @@ def test_wrong_channel_produces_no_response_and_no_audit_row(context):
     assert responses == []
     client.remove_user_from_groups.assert_not_called()
     assert context.audit_conn.execute("SELECT COUNT(*) FROM audit_log").fetchone()[0] == 0
+
+
+def test_wrong_channel_logs_warning(context, caplog):
+    client = MagicMock()
+    keycloak_integration.set_client(client)
+
+    with caplog.at_level("WARNING"):
+        _handle_revoke(make_command(channel_id="C_UNAUTHORIZED"), context, lambda *_: None)
+
+    assert any(record.levelname == "WARNING" for record in caplog.records)

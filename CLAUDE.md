@@ -108,7 +108,12 @@ per-event webhooks, which have no trust-level-change event at all — see
 `openspec/changes/archive/*-add-discourse-trust-level-trigger/design.md`
 for why), posting a custom-built, HMAC-signed JSON payload
 (`{old_trust_level, new_trust_level, username, timestamp}`) rather than a
-Discourse-defined format. Rate limiting, the admin log-level API, and
-dry-run mode remain stubs (`NotImplementedError`) with docstrings
-describing intended behavior per the spec. See the spec's Functional
-Requirements (§5) checklists for what remains to be built.
+Discourse-defined format. The Discourse webhook and all three Slack
+commands are rate-limited (in-memory, per-source-IP for the webhook,
+shared per-Slack-user-ID across `/trust`/`/revoke`/`/trust-status`) via
+`src/ratelimit.py: RateLimiter`, with violations and the existing
+channel-restriction rejections logged at WARNING level through a minimal
+JSON logging setup (`src/logging_setup.py`, `LOG_LEVEL` env var). The
+admin log-level API and dry-run mode remain stubs (`NotImplementedError`)
+with docstrings describing intended behavior per the spec. See the spec's
+Functional Requirements (§5) checklists for what remains to be built.

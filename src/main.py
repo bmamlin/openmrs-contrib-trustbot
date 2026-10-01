@@ -25,13 +25,16 @@ from src.config import load_config
 from src.integrations import discourse as discourse_integration
 from src.integrations import keycloak as keycloak_integration
 from src.integrations.slack import create_slack_app
+from src.logging_setup import configure_logging
+from src.ratelimit import RateLimiter
+
+config = load_config()
+configure_logging(config.logging.level)
 
 app = FastAPI(title="OpenMRS Trust Bot")
 
 app.include_router(health.router)
 app.include_router(admin.router)
-
-config = load_config()
 
 audit_conn = get_connection(config.database.path)
 app.state.audit_conn = audit_conn
@@ -56,6 +59,10 @@ discourse_integration.set_client(discourse_client)
 app.state.discourse_client = discourse_client
 
 _replay_window_override = os.environ.get("DISCOURSE_REPLAY_WINDOW_SECONDS", "").strip()
+discourse_webhook_rate_limiter = RateLimiter(
+    max_requests=config.rate_limiting.discourse_webhook.max_requests,
+    window_seconds=config.rate_limiting.discourse_webhook.window_seconds,
+)
 webhooks_router = webhooks.create_webhooks_router(
     webhook_secret=os.environ["DISCOURSE_WORKFLOW_SECRET"],
     replay_window_seconds=(
@@ -66,14 +73,20 @@ webhooks_router = webhooks.create_webhooks_router(
     workflow_name=config.discourse.webhook.workflow_name,
     discourse_base_url=config.discourse.base_url,
     audit_conn=audit_conn,
+    rate_limiter=discourse_webhook_rate_limiter,
 )
 app.include_router(webhooks_router)
 
+slack_commands_rate_limiter = RateLimiter(
+    max_requests=config.rate_limiting.slack_commands.max_requests,
+    window_seconds=config.rate_limiting.slack_commands.window_seconds,
+)
 slack_app = create_slack_app(
     os.environ["SLACK_BOT_TOKEN"],
     os.environ["SLACK_SIGNING_SECRET"],
     trusted_channel_id=config.slack.trusted_channel_id,
     audit_conn=audit_conn,
+    rate_limiter=slack_commands_rate_limiter,
 )
 app.state.slack_app = slack_app
 _slack_handler = SlackRequestHandler(slack_app)

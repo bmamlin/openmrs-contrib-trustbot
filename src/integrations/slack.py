@@ -16,6 +16,7 @@ command listeners.
 
 from __future__ import annotations
 
+import logging
 import sqlite3
 from dataclasses import dataclass
 from typing import Sequence
@@ -29,7 +30,12 @@ from src.engine.models import ActionResult
 from src.integrations import discourse as discourse_integration
 from src.integrations import keycloak as keycloak_integration
 from src.integrations.keycloak import UserNotFoundError
+from src.ratelimit import RateLimiter
 from src.triggers.slack import build_revoke_event, build_trust_event
+
+logger = logging.getLogger(__name__)
+
+RATE_LIMITED_MESSAGE = "You are sending commands too quickly. Please wait a moment and try again."
 
 
 @dataclass
@@ -46,6 +52,7 @@ def create_slack_app(
     *,
     trusted_channel_id: str,
     audit_conn: sqlite3.Connection,
+    rate_limiter: RateLimiter,
 ) -> App:
     """Construct and return the configured slack_bolt App with the `/trust` command registered."""
     # token_verification_enabled=False: skip the eager `auth.test` network
@@ -56,6 +63,14 @@ def create_slack_app(
     # (e.g. local dev, or Slack being briefly unreachable at boot).
     app = App(token=bot_token, signing_secret=signing_secret, token_verification_enabled=False)
     context = SlackContext(trusted_channel_id=trusted_channel_id, audit_conn=audit_conn)
+
+    @app.use
+    def rate_limit_middleware(body, next, ack):
+        user_id = body.get("user_id")
+        if not rate_limiter.is_allowed(user_id):
+            logger.warning("Slack command rate limit exceeded for user %s", user_id)
+            return ack(text=RATE_LIMITED_MESSAGE)
+        return next()
 
     @app.command("/trust")
     def handle_trust_command(ack, command, respond) -> None:
@@ -82,6 +97,11 @@ def create_slack_app(
 def _handle_trust(command: dict, context: SlackContext, respond) -> None:
     event = build_trust_event(command, trusted_channel_id=context.trusted_channel_id)
     if event is None:
+        logger.warning(
+            "/trust rejected: wrong channel (user %s, channel %s)",
+            command.get("user_id"),
+            command.get("channel_id"),
+        )
         return  # wrong channel: silent rejection, no response (see build_trust_event)
 
     if not event.openmrs_id:
@@ -116,6 +136,11 @@ def _format_response(openmrs_id: str, outcomes: Sequence[ActionResult]) -> str:
 def _handle_revoke(command: dict, context: SlackContext, respond) -> None:
     event = build_revoke_event(command, trusted_channel_id=context.trusted_channel_id)
     if event is None:
+        logger.warning(
+            "/revoke rejected: wrong channel (user %s, channel %s)",
+            command.get("user_id"),
+            command.get("channel_id"),
+        )
         return  # wrong channel: silent rejection, no response (see build_revoke_event)
 
     if not event.openmrs_id:
@@ -152,6 +177,11 @@ def _handle_trust_status(command: dict, context: SlackContext, respond) -> None:
     # reaches the rules engine, so the channel check is done inline rather
     # than through src/triggers/slack.py's build_*_event() — see design.md.
     if command.get("channel_id") != context.trusted_channel_id:
+        logger.warning(
+            "/trust-status rejected: wrong channel (user %s, channel %s)",
+            command.get("user_id"),
+            command.get("channel_id"),
+        )
         return  # wrong channel: silent rejection, no response
 
     openmrs_id = (command.get("text") or "").strip()

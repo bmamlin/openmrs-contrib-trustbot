@@ -146,3 +146,15 @@ def test_wrong_channel_produces_no_response(context):
     assert responses == []
     keycloak_client.get_user_groups.assert_not_called()
     discourse_client.get_trust_level.assert_not_called()
+
+
+def test_wrong_channel_logs_warning(context, caplog):
+    keycloak_client = MagicMock()
+    keycloak_integration.set_client(keycloak_client)
+    discourse_client = MagicMock()
+    discourse_integration.set_client(discourse_client)
+
+    with caplog.at_level("WARNING"):
+        _handle_trust_status(make_command(channel_id="C_UNAUTHORIZED"), context, lambda *_: None)
+
+    assert any(record.levelname == "WARNING" for record in caplog.records)

@@ -18,6 +18,7 @@ from fastapi.testclient import TestClient
 
 from src.api.webhooks import create_webhooks_router
 from src.audit.db import get_connection
+from src.ratelimit import RateLimiter
 
 WEBHOOK_SECRET = "test-webhook-secret"
 WORKFLOW_NAME = "trusted"
@@ -41,8 +42,7 @@ def valid_payload(**overrides) -> dict:
     return payload
 
 
-@pytest.fixture
-def client():
+def make_client(*, rate_limiter=None):
     conn = get_connection(":memory:")
     router = create_webhooks_router(
         webhook_secret=WEBHOOK_SECRET,
@@ -50,10 +50,17 @@ def client():
         workflow_name=WORKFLOW_NAME,
         discourse_base_url=DISCOURSE_BASE_URL,
         audit_conn=conn,
+        rate_limiter=rate_limiter or RateLimiter(max_requests=1000, window_seconds=60),
     )
     app = FastAPI()
     app.include_router(router)
-    with TestClient(app) as test_client:
+    return TestClient(app), conn
+
+
+@pytest.fixture
+def client():
+    test_client, conn = make_client()
+    with test_client:
         yield test_client, conn
 
 
@@ -142,3 +149,107 @@ def test_timestamp_too_far_in_future_returns_400(client):
 
     assert response.status_code == 400
     assert audit_row_count(conn) == 0
+
+
+def test_request_within_rate_limit_proceeds_to_signature_verification():
+    limiter = RateLimiter(max_requests=5, window_seconds=60)
+    test_client, conn = make_client(rate_limiter=limiter)
+    with test_client:
+        body = json.dumps(valid_payload()).encode()
+
+        response = post(test_client, body, signature="sha256=" + "0" * 64)
+
+        assert response.status_code == 403
+        assert audit_row_count(conn) == 0
+
+
+def test_request_exceeding_rate_limit_returns_429_before_signature_check():
+    limiter = RateLimiter(max_requests=1, window_seconds=60)
+    test_client, conn = make_client(rate_limiter=limiter)
+    with test_client:
+        body = json.dumps(valid_payload()).encode()
+        bad_signature = "sha256=" + "0" * 64
+
+        first = post(test_client, body, signature=bad_signature)
+        assert first.status_code == 403
+
+        second = post(test_client, body, signature=bad_signature)
+
+        assert second.status_code == 429
+        assert audit_row_count(conn) == 0
+
+
+def test_rate_limit_keyed_by_first_x_forwarded_for_address():
+    limiter = RateLimiter(max_requests=1, window_seconds=60)
+    test_client, conn = make_client(rate_limiter=limiter)
+    with test_client:
+        body = json.dumps(valid_payload()).encode()
+        bad_signature = "sha256=" + "0" * 64
+
+        def post_with_forwarded_for(forwarded_for: str):
+            return test_client.post(
+                "/webhook/discourse",
+                content=body,
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Discourse-Workflow-Secret": bad_signature,
+                    "X-Discourse-Workflow": WORKFLOW_NAME,
+                    "X-Forwarded-For": forwarded_for,
+                },
+            )
+
+        first = post_with_forwarded_for("203.0.113.5, 10.0.0.1")
+        assert first.status_code == 403
+
+        second = post_with_forwarded_for("203.0.113.5, 10.0.0.2")
+        assert second.status_code == 429
+
+        third = post_with_forwarded_for("198.51.100.9")
+        assert third.status_code == 403
+        assert audit_row_count(conn) == 0
+
+
+def test_rate_limit_rejection_logs_warning_with_source_ip(client, caplog):
+    test_client, conn = client
+    limiter_client, limiter_conn = make_client(rate_limiter=RateLimiter(max_requests=0, window_seconds=60))
+    with limiter_client:
+        body = json.dumps(valid_payload()).encode()
+        with caplog.at_level("WARNING"):
+            response = limiter_client.post(
+                "/webhook/discourse",
+                content=body,
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Discourse-Workflow-Secret": sign(body),
+                    "X-Discourse-Workflow": WORKFLOW_NAME,
+                    "X-Forwarded-For": "203.0.113.77",
+                },
+            )
+
+        assert response.status_code == 429
+        assert any(
+            record.levelname == "WARNING" and "203.0.113.77" in record.message
+            for record in caplog.records
+        )
+
+
+def test_invalid_signature_logs_warning(client, caplog):
+    test_client, conn = client
+    body = json.dumps(valid_payload()).encode()
+
+    with caplog.at_level("WARNING"):
+        response = post(test_client, body, signature="sha256=" + "0" * 64)
+
+    assert response.status_code == 403
+    assert any(record.levelname == "WARNING" for record in caplog.records)
+
+
+def test_wrong_workflow_name_logs_warning(client, caplog):
+    test_client, conn = client
+    body = json.dumps(valid_payload()).encode()
+
+    with caplog.at_level("WARNING"):
+        response = post(test_client, body, signature=sign(body), workflow="some-other-workflow")
+
+    assert response.status_code == 400
+    assert any(record.levelname == "WARNING" for record in caplog.records)

@@ -27,6 +27,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -35,9 +36,12 @@ from fastapi import APIRouter, HTTPException, Request
 
 from src.engine import evaluator
 from src.engine.loader import load_rules
+from src.ratelimit import RateLimiter
 from src.triggers.discourse import build_trust_level_event
 
 REQUIRED_PAYLOAD_FIELDS = ("username", "old_trust_level", "new_trust_level", "timestamp")
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -49,6 +53,7 @@ class WebhookContext:
     workflow_name: str
     discourse_base_url: str
     audit_conn: sqlite3.Connection
+    rate_limiter: RateLimiter
 
 
 def _verify_signature(raw_body: bytes, signature_header: str | None, secret: str) -> bool:
@@ -86,6 +91,14 @@ def _parse_payload(raw_body: bytes) -> dict:
     return payload
 
 
+def _source_ip(request: Request) -> str:
+    """Source IP for rate-limiting: first X-Forwarded-For address, else the connecting client."""
+    forwarded_for = request.headers.get("X-Forwarded-For")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
 def _is_within_replay_window(timestamp: str, window_seconds: int) -> bool:
     """True if `timestamp` (ISO 8601) is within window_seconds of now, past or future."""
     try:
@@ -105,6 +118,7 @@ def create_webhooks_router(
     workflow_name: str,
     discourse_base_url: str,
     audit_conn: sqlite3.Connection,
+    rate_limiter: RateLimiter,
 ) -> APIRouter:
     """Construct and return the configured webhook router."""
     context = WebhookContext(
@@ -113,19 +127,31 @@ def create_webhooks_router(
         workflow_name=workflow_name,
         discourse_base_url=discourse_base_url,
         audit_conn=audit_conn,
+        rate_limiter=rate_limiter,
     )
     router = APIRouter()
 
     @router.post("/webhook/discourse")
     async def discourse_webhook(request: Request) -> dict:
+        source_ip = _source_ip(request)
+        if not context.rate_limiter.is_allowed(source_ip):
+            logger.warning("Discourse webhook rate limit exceeded for source IP %s", source_ip)
+            raise HTTPException(status_code=429, detail="rate limit exceeded")
+
         raw_body = await request.body()
 
         if not _verify_signature(
             raw_body, request.headers.get("X-Discourse-Workflow-Secret"), context.webhook_secret
         ):
+            logger.warning("Discourse webhook rejected: invalid signature from %s", source_ip)
             raise HTTPException(status_code=403, detail="invalid signature")
 
         if request.headers.get("X-Discourse-Workflow") != context.workflow_name:
+            logger.warning(
+                "Discourse webhook rejected: unrecognized workflow name %r from %s",
+                request.headers.get("X-Discourse-Workflow"),
+                source_ip,
+            )
             raise HTTPException(status_code=400, detail="unrecognized workflow")
 
         try:
