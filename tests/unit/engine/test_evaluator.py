@@ -6,6 +6,7 @@ from src.engine.models import Action, ActionResult, Rule, RuleSet, Trigger, Trig
 def test_registries_are_populated_on_import():
     assert "slack_trust_command" in evaluator.TRIGGER_MATCHERS
     assert "slack_revoke_command" in evaluator.TRIGGER_MATCHERS
+    assert "discourse_trust_level" in evaluator.TRIGGER_MATCHERS
     assert "keycloak_add_groups" in evaluator.ACTION_EXECUTORS
     assert "keycloak_remove_groups" in evaluator.ACTION_EXECUTORS
 
@@ -49,9 +50,9 @@ def test_evaluate_matches_multiple_independent_rules():
 
 
 def test_evaluate_unregistered_trigger_type_never_matches():
-    rule = make_rule("future", ["discourse_trust_level"])
+    rule = make_rule("future", ["github_contribution"])
     rule_set = RuleSet(rules=[rule])
-    event = TriggerEvent(type="discourse_trust_level", openmrs_id="jdoe")
+    event = TriggerEvent(type="github_contribution", openmrs_id="jdoe")
 
     assert evaluator.evaluate(rule_set, event) == []
 

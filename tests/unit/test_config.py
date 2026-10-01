@@ -10,6 +10,7 @@ def test_load_config_parses_example_file():
 
     assert config.keycloak.realm == "OpenMRS"
     assert config.database.path == "/data/audit.db"
+    assert config.discourse.webhook.workflow_name == "trusted"
 
 
 def test_load_config_uses_config_path_env_var(monkeypatch):

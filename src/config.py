@@ -19,11 +19,16 @@ from pydantic import BaseModel
 
 class DiscourseWebhookConfig(BaseModel):
     replay_window_seconds: int = 300
+    # The expected X-Discourse-Workflow header value — a label chosen when
+    # configuring the Discourse Workflow, not a Discourse-defined
+    # constant, so required rather than defaulted: a missing value should
+    # fail config loading, not silently accept every workflow name.
+    workflow_name: str
 
 
 class DiscourseConfig(BaseModel):
     base_url: str
-    webhook: DiscourseWebhookConfig = DiscourseWebhookConfig()
+    webhook: DiscourseWebhookConfig
 
 
 class KeycloakRetryConfig(BaseModel):

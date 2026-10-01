@@ -13,7 +13,8 @@ from __future__ import annotations
 
 def register_all() -> None:
     from src.engine.evaluator import register_trigger
-    from src.triggers import slack
+    from src.triggers import discourse, slack
 
     register_trigger("slack_trust_command", slack.matches_trust)
     register_trigger("slack_revoke_command", slack.matches_revoke)
+    register_trigger("discourse_trust_level", discourse.matches)

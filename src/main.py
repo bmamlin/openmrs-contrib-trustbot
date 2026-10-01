@@ -29,7 +29,6 @@ from src.integrations.slack import create_slack_app
 app = FastAPI(title="OpenMRS Trust Bot")
 
 app.include_router(health.router)
-app.include_router(webhooks.router)
 app.include_router(admin.router)
 
 config = load_config()
@@ -55,6 +54,20 @@ discourse_client = discourse_integration.build_client(
 )
 discourse_integration.set_client(discourse_client)
 app.state.discourse_client = discourse_client
+
+_replay_window_override = os.environ.get("DISCOURSE_REPLAY_WINDOW_SECONDS", "").strip()
+webhooks_router = webhooks.create_webhooks_router(
+    webhook_secret=os.environ["DISCOURSE_WORKFLOW_SECRET"],
+    replay_window_seconds=(
+        int(_replay_window_override)
+        if _replay_window_override
+        else config.discourse.webhook.replay_window_seconds
+    ),
+    workflow_name=config.discourse.webhook.workflow_name,
+    discourse_base_url=config.discourse.base_url,
+    audit_conn=audit_conn,
+)
+app.include_router(webhooks_router)
 
 slack_app = create_slack_app(
     os.environ["SLACK_BOT_TOKEN"],

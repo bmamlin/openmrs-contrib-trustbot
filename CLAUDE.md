@@ -93,14 +93,22 @@ pytest
 ## Current state
 
 The rules engine core, the Slack `/trust`, `/revoke`, and `/trust-status`
-commands, the `keycloak_add_groups` / `keycloak_remove_groups` actions, and
-the audit log are implemented and tested (see `openspec/changes/archive/`)
-— `/trust <openmrs-id>` and `/revoke <openmrs-id>` in the configured Slack
-channel grant/revoke Keycloak group access end-to-end, and
-`/trust-status <openmrs-id>` reports current Keycloak groups, Discourse
-trust level, and recent audit history (read-only — it never reaches the
-rules engine, and degrades gracefully per-section if one data source is
-unavailable). The Discourse webhook trigger, rate limiting, the admin
-log-level API, and dry-run mode remain stubs (`NotImplementedError`) with
-docstrings describing intended behavior per the spec. See the spec's
-Functional Requirements (§5) checklists for what remains to be built.
+commands, the `keycloak_add_groups` / `keycloak_remove_groups` actions, the
+Discourse trust-level webhook trigger, and the audit log are implemented
+and tested (see `openspec/changes/archive/`) — `/trust <openmrs-id>` and
+`/revoke <openmrs-id>` in the configured Slack channel grant/revoke
+Keycloak group access end-to-end, `/trust-status <openmrs-id>` reports
+current Keycloak groups, Discourse trust level, and recent audit history
+(read-only — it never reaches the rules engine, and degrades gracefully
+per-section if one data source is unavailable), and reaching Discourse
+trust level 2+ automatically grants the same access via `POST
+/webhook/discourse`. That webhook is fed by a **Discourse Workflow**
+configured on the community's Discourse instance (not Discourse's native
+per-event webhooks, which have no trust-level-change event at all — see
+`openspec/changes/archive/*-add-discourse-trust-level-trigger/design.md`
+for why), posting a custom-built, HMAC-signed JSON payload
+(`{old_trust_level, new_trust_level, username, timestamp}`) rather than a
+Discourse-defined format. Rate limiting, the admin log-level API, and
+dry-run mode remain stubs (`NotImplementedError`) with docstrings
+describing intended behavior per the spec. See the spec's Functional
+Requirements (§5) checklists for what remains to be built.

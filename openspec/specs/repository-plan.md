@@ -109,7 +109,7 @@ full list. Key variables:
 
 | Variable | Description |
 |---|---|
-| `DISCOURSE_WEBHOOK_SECRET` | Shared secret for Discourse webhook signature verification |
+| `DISCOURSE_WORKFLOW_SECRET` | Shared secret for Discourse Workflow webhook signature verification |
 | `DISCOURSE_API_KEY` | Discourse API key (used by `/trust-status`) |
 | `DISCOURSE_API_USERNAME` | Discourse username for the API key |
 | `KEYCLOAK_CLIENT_ID` | Trust Bot service account client ID |

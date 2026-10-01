@@ -32,8 +32,15 @@ discourse:
   webhook:
     # Duration (in seconds) within which a webhook payload timestamp must fall
     # to be accepted. Payloads outside this window are rejected as potential
-    # replays. Corresponds to env var DISCOURSE_WEBHOOK_SECRET.
+    # replays. Overridable via env var DISCOURSE_REPLAY_WINDOW_SECONDS.
     replay_window_seconds: 300       # default: 5 minutes
+
+    # The expected value of the X-Discourse-Workflow header on incoming
+    # webhook requests — the name/label chosen when configuring the
+    # Discourse Workflow on the community's Discourse instance (not a
+    # Discourse-defined constant). Requests with any other value are
+    # rejected.
+    workflow_name: "trusted"
 
   # Discourse API credentials are supplied via environment variables:
   #   DISCOURSE_API_KEY
@@ -200,7 +207,7 @@ These are never stored in YAML files.
 
 | Variable | Required | Description |
 |---|---|---|
-| `DISCOURSE_WEBHOOK_SECRET` | Yes | Shared secret used to verify Discourse webhook signatures |
+| `DISCOURSE_WORKFLOW_SECRET` | Yes | Shared secret used to verify the Discourse Workflow's HTTP action signature (`X-Discourse-Workflow-Secret`) |
 | `DISCOURSE_API_KEY` | Yes | Discourse API key for read access (used by `/trust-status`) |
 | `DISCOURSE_API_USERNAME` | Yes | Discourse username associated with the API key |
 | `KEYCLOAK_CLIENT_ID` | Yes | Client ID for the Trust Bot service account in Keycloak |

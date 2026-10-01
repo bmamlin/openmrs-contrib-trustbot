@@ -24,6 +24,9 @@ TRUSTED_CHANNEL = "C0123456789"
 CONFIG_YAML = """
 discourse:
   base_url: "https://talk.openmrs.org"
+  webhook:
+    replay_window_seconds: 300
+    workflow_name: "trusted"
 keycloak:
   base_url: "https://id-new.openmrs.org"
   realm: "OpenMRS"
@@ -55,6 +58,7 @@ def app_client(tmp_path, monkeypatch):
     monkeypatch.setenv("SLACK_SIGNING_SECRET", SIGNING_SECRET)
     monkeypatch.setenv("DISCOURSE_API_KEY", "dummy-discourse-api-key")
     monkeypatch.setenv("DISCOURSE_API_USERNAME", "dummy-discourse-api-username")
+    monkeypatch.setenv("DISCOURSE_WORKFLOW_SECRET", "dummy-workflow-secret")
 
     sys.modules.pop("src.main", None)
     main = importlib.import_module("src.main")
