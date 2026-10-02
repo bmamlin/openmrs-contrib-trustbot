@@ -39,8 +39,7 @@ def reset_keycloak_client():
     keycloak_integration._client = None
 
 
-@pytest.fixture
-def client(tmp_path):
+def make_client(tmp_path, *, dry_run: bool = False):
     conn = get_connection(str(tmp_path / "audit.db"))
     router = create_webhooks_router(
         webhook_secret=WEBHOOK_SECRET,
@@ -49,10 +48,17 @@ def client(tmp_path):
         discourse_base_url=DISCOURSE_BASE_URL,
         audit_conn=conn,
         rate_limiter=RateLimiter(max_requests=1000, window_seconds=60),
+        dry_run=dry_run,
     )
     app = FastAPI()
     app.include_router(router)
-    with TestClient(app) as test_client:
+    return TestClient(app), conn
+
+
+@pytest.fixture
+def client(tmp_path):
+    test_client, conn = make_client(tmp_path)
+    with test_client:
         yield test_client, conn
     conn.close()
 
@@ -125,3 +131,21 @@ def test_no_rule_matches_below_threshold(client):
     assert response.status_code == 200
     keycloak_client.add_user_to_groups.assert_not_called()
     assert conn.execute("SELECT COUNT(*) FROM audit_log").fetchone()[0] == 0
+
+
+def test_dry_run_records_dry_run_status_and_does_not_mutate_keycloak(tmp_path):
+    test_client, conn = make_client(tmp_path, dry_run=True)
+    with test_client:
+        keycloak_client = MagicMock()
+        keycloak_client.add_user_to_groups.return_value = ["jira-users", "confluence-users"]
+        keycloak_integration.set_client(keycloak_client)
+
+        response = post_trust_level_event(test_client)
+
+        assert response.status_code == 200
+        status = conn.execute("SELECT status FROM audit_log").fetchone()[0]
+        assert status == "dry_run"
+        keycloak_client.add_user_to_groups.assert_called_once_with(
+            "jdoe", ["jira-users", "jira-trunk-developer", "confluence-users"], dry_run=True
+        )
+    conn.close()

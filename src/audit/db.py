@@ -49,8 +49,8 @@ def record_event(
     status: str,
     detail: str | None,
 ) -> None:
-    """Insert one append-only audit_log row. status must be 'success' | 'no_change' | 'failure'."""
-    if status not in ("success", "no_change", "failure"):
+    """Insert one append-only audit_log row. status must be 'success' | 'no_change' | 'failure' | 'dry_run'."""
+    if status not in ("success", "no_change", "failure", "dry_run"):
         raise ValueError(f"invalid audit status: {status!r}")
     conn.execute(
         """

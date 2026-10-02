@@ -124,6 +124,17 @@ admin:
 
   # Admin API credentials are supplied via environment variables:
   #   ADMIN_API_TOKEN
+
+# -----------------------------------------------------------------------------
+# Dry-run mode
+# -----------------------------------------------------------------------------
+# When true, every matched rule's actions are evaluated and logged to the
+# audit log (status 'dry_run'), but no external system (e.g. Keycloak) is
+# actually changed. Applies uniformly to the Discourse webhook and every
+# Slack command. Can also be set or overridden via the DRY_RUN environment
+# variable (true/false, case-insensitive); a blank/unset DRY_RUN falls back
+# to this value.
+dry_run: false
 ```
 
 ---
@@ -217,6 +228,7 @@ These are never stored in YAML files.
 | `ADMIN_API_TOKEN` | Yes | Bearer token for the admin API endpoints |
 | `LOG_LEVEL` | No | Overrides `logging.level` in `config.yaml` if set |
 | `DISCOURSE_REPLAY_WINDOW_SECONDS` | No | Overrides `discourse.webhook.replay_window_seconds` if set |
+| `DRY_RUN` | No | Overrides `dry_run` in `config.yaml` if set (`true`/`false`, case-insensitive) |
 
 ---
 

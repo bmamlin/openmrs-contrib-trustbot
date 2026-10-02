@@ -54,6 +54,7 @@ class WebhookContext:
     discourse_base_url: str
     audit_conn: sqlite3.Connection
     rate_limiter: RateLimiter
+    dry_run: bool = False
 
 
 def _verify_signature(raw_body: bytes, signature_header: str | None, secret: str) -> bool:
@@ -119,6 +120,7 @@ def create_webhooks_router(
     discourse_base_url: str,
     audit_conn: sqlite3.Connection,
     rate_limiter: RateLimiter,
+    dry_run: bool = False,
 ) -> APIRouter:
     """Construct and return the configured webhook router."""
     context = WebhookContext(
@@ -128,6 +130,7 @@ def create_webhooks_router(
         discourse_base_url=discourse_base_url,
         audit_conn=audit_conn,
         rate_limiter=rate_limiter,
+        dry_run=dry_run,
     )
     router = APIRouter()
 
@@ -166,7 +169,7 @@ def create_webhooks_router(
         rule_set = load_rules()
         matched_rules = evaluator.evaluate(rule_set, event)
         for rule in matched_rules:
-            evaluator.execute_rule(rule, event, conn=context.audit_conn)
+            evaluator.execute_rule(rule, event, conn=context.audit_conn, dry_run=context.dry_run)
 
         return {"status": "ok"}
 

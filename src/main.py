@@ -49,6 +49,11 @@ app.include_router(admin_router)
 audit_conn = get_connection(config.database.path)
 app.state.audit_conn = audit_conn
 
+_dry_run_override = os.environ.get("DRY_RUN", "").strip().lower()
+dry_run = (
+    _dry_run_override in ("true", "1", "yes", "on") if _dry_run_override else config.dry_run
+)
+
 keycloak_client = keycloak_integration.build_client(
     config.keycloak.base_url,
     config.keycloak.realm,
@@ -84,6 +89,7 @@ webhooks_router = webhooks.create_webhooks_router(
     discourse_base_url=config.discourse.base_url,
     audit_conn=audit_conn,
     rate_limiter=discourse_webhook_rate_limiter,
+    dry_run=dry_run,
 )
 app.include_router(webhooks_router)
 
@@ -97,6 +103,7 @@ slack_app = create_slack_app(
     trusted_channel_id=config.slack.trusted_channel_id,
     audit_conn=audit_conn,
     rate_limiter=slack_commands_rate_limiter,
+    dry_run=dry_run,
 )
 app.state.slack_app = slack_app
 _slack_handler = SlackRequestHandler(slack_app)

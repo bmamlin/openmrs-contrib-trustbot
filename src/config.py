@@ -78,6 +78,7 @@ class ServiceConfig(BaseModel):
     logging: LoggingConfig = LoggingConfig()
     database: DatabaseConfig = DatabaseConfig()
     admin: AdminConfig = AdminConfig()
+    dry_run: bool = False
 
 
 def default_config_path() -> Path:

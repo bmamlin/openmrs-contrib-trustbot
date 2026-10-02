@@ -60,8 +60,8 @@ def test_evaluate_unregistered_trigger_type_never_matches():
 def test_execute_rule_dispatches_to_registered_executor_and_audits(tmp_path, monkeypatch):
     calls = []
 
-    def fake_executor(action, event):
-        calls.append((action.type, event.openmrs_id))
+    def fake_executor(action, event, dry_run):
+        calls.append((action.type, event.openmrs_id, dry_run))
         return ActionResult(status="success", detail="ok", action_detail='["jira-users"]')
 
     monkeypatch.setitem(evaluator.ACTION_EXECUTORS, "keycloak_add_groups", fake_executor)
@@ -72,15 +72,37 @@ def test_execute_rule_dispatches_to_registered_executor_and_audits(tmp_path, mon
 
     results = evaluator.execute_rule(rule, event, conn=conn)
 
-    assert calls == [("keycloak_add_groups", "jdoe")]
+    assert calls == [("keycloak_add_groups", "jdoe", False)]
     assert [r.status for r in results] == ["success"]
 
     row = conn.execute("SELECT rule_name, trigger_src, status FROM audit_log").fetchone()
     assert row == ("grant", "alice", "success")
 
 
+def test_execute_rule_passes_dry_run_through_to_executor(tmp_path, monkeypatch):
+    calls = []
+
+    def fake_executor(action, event, dry_run):
+        calls.append(dry_run)
+        return ActionResult(status="dry_run" if dry_run else "success", detail="ok")
+
+    monkeypatch.setitem(evaluator.ACTION_EXECUTORS, "keycloak_add_groups", fake_executor)
+
+    rule = make_rule("grant", ["slack_trust_command"])
+    event = TriggerEvent(type="slack_trust_command", openmrs_id="jdoe", source="alice")
+    conn = get_connection(str(tmp_path / "audit.db"))
+
+    results = evaluator.execute_rule(rule, event, conn=conn, dry_run=True)
+
+    assert calls == [True]
+    assert [r.status for r in results] == ["dry_run"]
+
+    row = conn.execute("SELECT status FROM audit_log").fetchone()
+    assert row == ("dry_run",)
+
+
 def test_execute_rule_records_failure_and_continues_when_executor_raises(tmp_path, monkeypatch):
-    def broken_executor(action, event):
+    def broken_executor(action, event, dry_run):
         raise RuntimeError("boom")
 
     monkeypatch.setitem(evaluator.ACTION_EXECUTORS, "keycloak_add_groups", broken_executor)

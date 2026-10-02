@@ -32,6 +32,13 @@ def context(tmp_path):
     conn.close()
 
 
+@pytest.fixture
+def dry_run_context(tmp_path):
+    conn = get_connection(str(tmp_path / "audit.db"))
+    yield SlackContext(trusted_channel_id=TRUSTED_CHANNEL, audit_conn=conn, dry_run=True)
+    conn.close()
+
+
 @pytest.fixture(autouse=True)
 def reset_keycloak_client():
     yield
@@ -98,6 +105,27 @@ def test_wrong_channel_produces_no_response_and_no_audit_row(context):
     assert responses == []
     client.add_user_to_groups.assert_not_called()
     assert context.audit_conn.execute("SELECT COUNT(*) FROM audit_log").fetchone()[0] == 0
+
+
+def test_dry_run_simulates_grant_without_mutating_keycloak(dry_run_context):
+    client = MagicMock()
+    client.add_user_to_groups.return_value = ["jira-users", "jira-trunk-developer", "confluence-users"]
+    keycloak_integration.set_client(client)
+
+    responses = []
+    _handle_trust(make_command(), dry_run_context, responses.append)
+
+    assert len(responses) == 1
+    assert "DRY RUN" in responses[0]
+    assert "No change was made" in responses[0]
+
+    row = dry_run_context.audit_conn.execute(
+        "SELECT status FROM audit_log"
+    ).fetchone()
+    assert row == ("dry_run",)
+    client.add_user_to_groups.assert_called_once_with(
+        "jdoe", ["jira-users", "jira-trunk-developer", "confluence-users"], dry_run=True
+    )
 
 
 def test_wrong_channel_logs_warning(context, caplog):

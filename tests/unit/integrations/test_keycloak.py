@@ -82,6 +82,40 @@ def test_add_user_to_groups_retries_once_on_connection_error_then_succeeds(clien
     assert added == ["jira-users"]
 
 
+def test_add_user_to_groups_dry_run_returns_would_be_added_without_mutating(client):
+    with (
+        patch.object(client._admin, "get_user_id", return_value="uid-1"),
+        patch.object(
+            client._admin, "get_user_groups", return_value=[{"name": "jira-users"}]
+        ),
+        patch.object(client._admin, "get_group_by_path") as get_group_by_path,
+        patch.object(client._admin, "group_user_add") as group_user_add,
+    ):
+        added = client.add_user_to_groups(
+            "jdoe", ["jira-users", "jira-trunk-developer", "confluence-users"], dry_run=True
+        )
+
+    assert set(added) == {"jira-trunk-developer", "confluence-users"}
+    get_group_by_path.assert_not_called()
+    group_user_add.assert_not_called()
+
+
+def test_add_user_to_groups_dry_run_with_nothing_to_add(client):
+    with (
+        patch.object(client._admin, "get_user_id", return_value="uid-1"),
+        patch.object(
+            client._admin, "get_user_groups", return_value=[{"name": "jira-users"}]
+        ),
+        patch.object(client._admin, "get_group_by_path") as get_group_by_path,
+        patch.object(client._admin, "group_user_add") as group_user_add,
+    ):
+        added = client.add_user_to_groups("jdoe", ["jira-users"], dry_run=True)
+
+    assert added == []
+    get_group_by_path.assert_not_called()
+    group_user_add.assert_not_called()
+
+
 def test_remove_user_from_groups_only_removes_groups_user_has(client):
     with (
         patch.object(client._admin, "get_user_id", return_value="uid-1"),
@@ -129,6 +163,40 @@ def test_remove_user_from_groups_retries_once_on_connection_error_then_succeeds(
 
     assert call_count["n"] == 2
     assert removed == ["jira-users"]
+
+
+def test_remove_user_from_groups_dry_run_returns_would_be_removed_without_mutating(client):
+    with (
+        patch.object(client._admin, "get_user_id", return_value="uid-1"),
+        patch.object(
+            client._admin,
+            "get_user_groups",
+            return_value=[{"name": "jira-users"}, {"name": "confluence-users"}],
+        ),
+        patch.object(client._admin, "get_group_by_path") as get_group_by_path,
+        patch.object(client._admin, "group_user_remove") as group_user_remove,
+    ):
+        removed = client.remove_user_from_groups(
+            "jdoe", ["jira-users", "jira-trunk-developer", "confluence-users"], dry_run=True
+        )
+
+    assert set(removed) == {"jira-users", "confluence-users"}
+    get_group_by_path.assert_not_called()
+    group_user_remove.assert_not_called()
+
+
+def test_remove_user_from_groups_dry_run_with_nothing_to_remove(client):
+    with (
+        patch.object(client._admin, "get_user_id", return_value="uid-1"),
+        patch.object(client._admin, "get_user_groups", return_value=[]),
+        patch.object(client._admin, "get_group_by_path") as get_group_by_path,
+        patch.object(client._admin, "group_user_remove") as group_user_remove,
+    ):
+        removed = client.remove_user_from_groups("jdoe", ["jira-users"], dry_run=True)
+
+    assert removed == []
+    get_group_by_path.assert_not_called()
+    group_user_remove.assert_not_called()
 
 
 def test_raises_after_retry_exhausted_on_persistent_connection_error(client):

@@ -118,6 +118,9 @@ admin log-level API (`POST /admin/log-level`, bearer-token protected via
 `ADMIN_API_TOKEN` when `config.yaml`'s `admin.require_auth` is true —
 the default) changes the running process's log level at runtime without
 a restart, reusing the same `src/logging_setup.py` logger. Dry-run mode
-remains a stub (`NotImplementedError`) with a docstring describing
-intended behavior per the spec. See the spec's Functional Requirements
-(§5) checklists for what remains to be built.
+(`config.yaml`'s `dry_run`, overridable via `DRY_RUN`) makes every
+trigger path — the Discourse webhook and all three Slack commands —
+evaluate and audit-log rule actions as usual (status `dry_run`) without
+making any actual Keycloak change; `/trust`/`/revoke` responses disclose
+this explicitly when active. Every item in the spec's Functional and
+Security Requirements checklists (§5–§6) is now implemented.

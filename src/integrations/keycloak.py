@@ -78,12 +78,17 @@ class KeycloakClient:
         user_id = self._require_user_id(openmrs_id)
         return self._group_names_for_user_id(user_id)
 
-    def add_user_to_groups(self, openmrs_id: str, groups: list[str]) -> list[str]:
+    def add_user_to_groups(
+        self, openmrs_id: str, groups: list[str], *, dry_run: bool = False
+    ) -> list[str]:
         """Add openmrs_id to each of `groups` it isn't already in.
 
         Idempotent: existing memberships are left untouched. Returns the
         list of group names actually added (empty if the user already had
         all of them). Raises UserNotFoundError if openmrs_id doesn't exist.
+        When dry_run is True, current membership is still queried live and
+        the would-be-added list is still returned, but no group_user_add
+        call is made.
         """
         user_id = self._require_user_id(openmrs_id)
         current = set(self._group_names_for_user_id(user_id))
@@ -92,18 +97,23 @@ class KeycloakClient:
         for group_name in groups:
             if group_name in current:
                 continue
-            group = self._call_with_retry(self._admin.get_group_by_path, f"/{group_name}")
-            self._call_with_retry(self._admin.group_user_add, user_id, group["id"])
+            if not dry_run:
+                group = self._call_with_retry(self._admin.get_group_by_path, f"/{group_name}")
+                self._call_with_retry(self._admin.group_user_add, user_id, group["id"])
             added.append(group_name)
         return added
 
-    def remove_user_from_groups(self, openmrs_id: str, groups: list[str]) -> list[str]:
+    def remove_user_from_groups(
+        self, openmrs_id: str, groups: list[str], *, dry_run: bool = False
+    ) -> list[str]:
         """Remove openmrs_id from each of `groups` it is currently in.
 
         Idempotent: groups the user doesn't have are left alone (not an
         error). Returns the list of group names actually removed (empty
         if the user held none of them). Raises UserNotFoundError if
-        openmrs_id doesn't exist.
+        openmrs_id doesn't exist. When dry_run is True, current membership
+        is still queried live and the would-be-removed list is still
+        returned, but no group_user_remove call is made.
         """
         user_id = self._require_user_id(openmrs_id)
         current = set(self._group_names_for_user_id(user_id))
@@ -112,8 +122,9 @@ class KeycloakClient:
         for group_name in groups:
             if group_name not in current:
                 continue
-            group = self._call_with_retry(self._admin.get_group_by_path, f"/{group_name}")
-            self._call_with_retry(self._admin.group_user_remove, user_id, group["id"])
+            if not dry_run:
+                group = self._call_with_retry(self._admin.get_group_by_path, f"/{group_name}")
+                self._call_with_retry(self._admin.group_user_remove, user_id, group["id"])
             removed.append(group_name)
         return removed
 

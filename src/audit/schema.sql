@@ -11,6 +11,6 @@ CREATE TABLE IF NOT EXISTS audit_log (
     rule_name     TEXT    NOT NULL,          -- matched rule name from YAML
     action        TEXT    NOT NULL,          -- e.g. 'keycloak_add_groups'
     action_detail TEXT,                      -- e.g. JSON list of groups
-    status        TEXT    NOT NULL,          -- 'success' | 'no_change' | 'failure'
+    status        TEXT    NOT NULL,          -- 'success' | 'no_change' | 'failure' | 'dry_run'
     detail        TEXT                       -- error message or 'no change: already a member' etc.
 );

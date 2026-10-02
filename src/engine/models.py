@@ -69,6 +69,6 @@ class ActionResult(BaseModel):
     """The outcome of executing one action, used for both the caller's
     response and the audit log entry."""
 
-    status: Literal["success", "no_change", "failure"]
+    status: Literal["success", "no_change", "failure", "dry_run"]
     detail: str | None = None
     action_detail: str | None = None   # e.g. JSON list of groups actually added

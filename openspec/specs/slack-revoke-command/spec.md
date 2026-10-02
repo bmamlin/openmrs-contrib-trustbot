@@ -45,6 +45,8 @@ OpenMRS ID as the target.
 ### Requirement: The caller receives a clear response for every valid command
 The system SHALL respond in Slack with a clear outcome message for every
 `/revoke` command that passes authorization checks (signature + channel).
+If dry-run mode is active, the response SHALL clearly state that no real
+change was made, rather than using the normal success/no-change wording.
 
 #### Scenario: Access revoked
 - **WHEN** the triggered rule's action successfully removes the target
@@ -62,6 +64,13 @@ The system SHALL respond in Slack with a clear outcome message for every
 - **WHEN** the target OpenMRS ID does not exist in Keycloak
 - **THEN** the service responds with a descriptive failure message and
   logs the error
+
+#### Scenario: Dry-run mode is active
+- **WHEN** a `/revoke <openmrs-id>` command passes authorization checks
+  while dry-run mode is active
+- **THEN** the service responds with a message stating that the
+  revocation was simulated and no real change was made, instead of the
+  normal "revoked" or "already not trusted" wording
 
 ### Requirement: Command issuer identity is captured
 For every `/revoke` command that passes authorization checks, the system

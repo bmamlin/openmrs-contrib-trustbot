@@ -110,6 +110,23 @@ def test_get_recent_events_returns_only_that_users_rows_newest_first(conn):
     assert [e["action_detail"] for e in events] == ["third", "second"]
 
 
+def test_record_event_accepts_dry_run_status(conn):
+    record_event(
+        conn,
+        openmrs_id="jdoe",
+        trigger="slack_trust_command",
+        trigger_src="alice",
+        rule_name="rule",
+        action="keycloak_add_groups",
+        action_detail=None,
+        status="dry_run",
+        detail="would add jira-users",
+    )
+
+    row = conn.execute("SELECT status FROM audit_log").fetchone()
+    assert row == ("dry_run",)
+
+
 def test_record_event_rejects_unknown_status(conn):
     with pytest.raises(ValueError):
         record_event(

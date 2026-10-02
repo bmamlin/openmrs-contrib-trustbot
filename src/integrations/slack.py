@@ -44,6 +44,7 @@ class SlackContext:
 
     trusted_channel_id: str
     audit_conn: sqlite3.Connection
+    dry_run: bool = False
 
 
 def create_slack_app(
@@ -53,6 +54,7 @@ def create_slack_app(
     trusted_channel_id: str,
     audit_conn: sqlite3.Connection,
     rate_limiter: RateLimiter,
+    dry_run: bool = False,
 ) -> App:
     """Construct and return the configured slack_bolt App with the `/trust` command registered."""
     # token_verification_enabled=False: skip the eager `auth.test` network
@@ -62,7 +64,9 @@ def create_slack_app(
     # the service can start without live Slack connectivity/credentials
     # (e.g. local dev, or Slack being briefly unreachable at boot).
     app = App(token=bot_token, signing_secret=signing_secret, token_verification_enabled=False)
-    context = SlackContext(trusted_channel_id=trusted_channel_id, audit_conn=audit_conn)
+    context = SlackContext(
+        trusted_channel_id=trusted_channel_id, audit_conn=audit_conn, dry_run=dry_run
+    )
 
     @app.use
     def rate_limit_middleware(body, next, ack):
@@ -117,7 +121,9 @@ def _handle_trust(command: dict, context: SlackContext, respond) -> None:
 
     outcomes: list[ActionResult] = []
     for rule in matched_rules:
-        outcomes.extend(evaluator.execute_rule(rule, event, conn=context.audit_conn))
+        outcomes.extend(
+            evaluator.execute_rule(rule, event, conn=context.audit_conn, dry_run=context.dry_run)
+        )
 
     respond(_format_response(event.openmrs_id, outcomes))
 
@@ -126,6 +132,9 @@ def _format_response(openmrs_id: str, outcomes: Sequence[ActionResult]) -> str:
     failures = [o for o in outcomes if o.status == "failure"]
     if failures:
         return f"Could not grant access to `{openmrs_id}`: {failures[0].detail}"
+
+    if all(o.status == "dry_run" for o in outcomes):
+        return f"[DRY RUN] `{openmrs_id}` would be granted community edit access. No change was made."
 
     if all(o.status == "no_change" for o in outcomes):
         return f"`{openmrs_id}` is already trusted."
@@ -156,7 +165,9 @@ def _handle_revoke(command: dict, context: SlackContext, respond) -> None:
 
     outcomes: list[ActionResult] = []
     for rule in matched_rules:
-        outcomes.extend(evaluator.execute_rule(rule, event, conn=context.audit_conn))
+        outcomes.extend(
+            evaluator.execute_rule(rule, event, conn=context.audit_conn, dry_run=context.dry_run)
+        )
 
     respond(_format_revoke_response(event.openmrs_id, outcomes))
 
@@ -165,6 +176,9 @@ def _format_revoke_response(openmrs_id: str, outcomes: Sequence[ActionResult]) -
     failures = [o for o in outcomes if o.status == "failure"]
     if failures:
         return f"Could not revoke access for `{openmrs_id}`: {failures[0].detail}"
+
+    if all(o.status == "dry_run" for o in outcomes):
+        return f"[DRY RUN] `{openmrs_id}` would have community edit access revoked. No change was made."
 
     if all(o.status == "no_change" for o in outcomes):
         return f"`{openmrs_id}` is already not trusted."

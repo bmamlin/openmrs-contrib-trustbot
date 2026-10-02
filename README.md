@@ -215,12 +215,28 @@ unrecognized level name gets `400` and leaves the current level
 unchanged. Set `admin.require_auth: false` in `config.yaml` to skip the
 token check entirely (local development only — never in production).
 
+### Test dry-run mode
+
+Set `DRY_RUN=true` in `.env` (or `dry_run: true` in `config.yaml`) and
+restart the service. Issue `/trust test1` as in [Test the `/trust`
+command](#test-the-trust-command) above: the Slack response states the
+grant was simulated and no real change was made, and `test1`'s Keycloak
+groups are unchanged. Confirm via:
+
+```bash
+sqlite3 data/audit.db "select status from audit_log order by id desc limit 1;"
+```
+
+which should show `dry_run` rather than `success`. Set `DRY_RUN=false`
+(or remove it) and restart to return to normal operation.
+
 ## Status
 
 The rules engine core, the Slack `/trust`/`/revoke`/`/trust-status`
 commands, the Discourse trust-level webhook trigger, the audit log, rate
-limiting, and the admin log-level API are implemented and tested.
-Dry-run mode remains stubbed out. See
+limiting, the admin log-level API, and dry-run mode are all implemented
+and tested — every item in the project spec's Functional and Security
+Requirements checklists is now built. See
 [openspec/specs/overview.md](openspec/specs/overview.md) for the full
 functional and security requirements this project is being built against,
 and [CLAUDE.md](CLAUDE.md) for a more detailed current-state summary.

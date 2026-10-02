@@ -20,14 +20,16 @@ from src.audit.db import record_event
 from src.engine.models import Action, ActionResult, Rule, RuleSet, Trigger, TriggerEvent
 
 TRIGGER_MATCHERS: dict[str, Callable[[Trigger, TriggerEvent], bool]] = {}
-ACTION_EXECUTORS: dict[str, Callable[[Action, TriggerEvent], ActionResult]] = {}
+ACTION_EXECUTORS: dict[str, Callable[[Action, TriggerEvent, bool], ActionResult]] = {}
 
 
 def register_trigger(type_name: str, matcher: Callable[[Trigger, TriggerEvent], bool]) -> None:
     TRIGGER_MATCHERS[type_name] = matcher
 
 
-def register_action(type_name: str, executor: Callable[[Action, TriggerEvent], ActionResult]) -> None:
+def register_action(
+    type_name: str, executor: Callable[[Action, TriggerEvent, bool], ActionResult]
+) -> None:
     ACTION_EXECUTORS[type_name] = executor
 
 
@@ -57,14 +59,19 @@ def evaluate(rule_set: RuleSet, event: TriggerEvent) -> list[Rule]:
     ]
 
 
-def execute_rule(rule: Rule, event: TriggerEvent, *, conn: sqlite3.Connection) -> list[ActionResult]:
+def execute_rule(
+    rule: Rule, event: TriggerEvent, *, conn: sqlite3.Connection, dry_run: bool = False
+) -> list[ActionResult]:
     """Execute all actions for a matched rule and record each outcome to the audit log.
 
     All actions must be idempotent; a no-op result (e.g. user already has
     the group) is still recorded in the audit log per spec §4.4. An
     executor raising an unexpected exception is treated as a failure
     rather than propagating, so one broken action can't stop evaluation
-    of other matched rules for the same event.
+    of other matched rules for the same event. `dry_run` is passed through
+    to each executor unchanged — the engine itself has no notion of what
+    "dry run" means for a given action type, only the executor does (see
+    add-dry-run-mode design.md).
     """
     results = []
     for action in rule.actions:
@@ -75,7 +82,7 @@ def execute_rule(rule: Rule, event: TriggerEvent, *, conn: sqlite3.Connection) -
             )
         else:
             try:
-                result = executor(action, event)
+                result = executor(action, event, dry_run)
             except Exception as exc:  # noqa: BLE001 - deliberately broad, see docstring
                 result = ActionResult(status="failure", detail=f"Unexpected error: {exc}")
 
