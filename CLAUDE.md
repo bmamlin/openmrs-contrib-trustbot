@@ -114,6 +114,10 @@ shared per-Slack-user-ID across `/trust`/`/revoke`/`/trust-status`) via
 `src/ratelimit.py: RateLimiter`, with violations and the existing
 channel-restriction rejections logged at WARNING level through a minimal
 JSON logging setup (`src/logging_setup.py`, `LOG_LEVEL` env var). The
-admin log-level API and dry-run mode remain stubs (`NotImplementedError`)
-with docstrings describing intended behavior per the spec. See the spec's
-Functional Requirements (§5) checklists for what remains to be built.
+admin log-level API (`POST /admin/log-level`, bearer-token protected via
+`ADMIN_API_TOKEN` when `config.yaml`'s `admin.require_auth` is true —
+the default) changes the running process's log level at runtime without
+a restart, reusing the same `src/logging_setup.py` logger. Dry-run mode
+remains a stub (`NotImplementedError`) with a docstring describing
+intended behavior per the spec. See the spec's Functional Requirements
+(§5) checklists for what remains to be built.

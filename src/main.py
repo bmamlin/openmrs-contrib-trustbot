@@ -34,7 +34,17 @@ configure_logging(config.logging.level)
 app = FastAPI(title="OpenMRS Trust Bot")
 
 app.include_router(health.router)
-app.include_router(admin.router)
+
+_admin_api_token = os.environ.get("ADMIN_API_TOKEN", "").strip()
+if config.admin.require_auth and not _admin_api_token:
+    raise RuntimeError(
+        "ADMIN_API_TOKEN must be set when admin.require_auth is true (config.yaml)"
+    )
+admin_router = admin.create_admin_router(
+    admin_api_token=_admin_api_token,
+    require_auth=config.admin.require_auth,
+)
+app.include_router(admin_router)
 
 audit_conn = get_connection(config.database.path)
 app.state.audit_conn = audit_conn

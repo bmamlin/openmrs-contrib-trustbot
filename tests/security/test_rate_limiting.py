@@ -83,6 +83,7 @@ def app_client(tmp_path, monkeypatch):
     monkeypatch.setenv("DISCOURSE_API_KEY", "dummy-discourse-api-key")
     monkeypatch.setenv("DISCOURSE_API_USERNAME", "dummy-discourse-api-username")
     monkeypatch.setenv("DISCOURSE_WORKFLOW_SECRET", WEBHOOK_SECRET)
+    monkeypatch.setenv("ADMIN_API_TOKEN", "dummy-admin-token")
     monkeypatch.setenv("RULES_PATH", str(Path(__file__).parents[2] / "config" / "rules.example.yaml"))
 
     sys.modules.pop("src.main", None)

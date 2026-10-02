@@ -3,7 +3,7 @@ import logging
 
 import pytest
 
-from src.logging_setup import configure_logging
+from src.logging_setup import configure_logging, set_log_level
 
 
 @pytest.fixture(autouse=True)
@@ -55,3 +55,31 @@ def test_blank_log_level_env_var_falls_back_to_default(monkeypatch, capsys):
     captured = capsys.readouterr()
     output = captured.err + captured.out
     assert "debug line" in output
+
+
+def test_set_log_level_takes_effect_immediately(capsys):
+    configure_logging("INFO")
+
+    logger = logging.getLogger("test.logger.runtime_change")
+    logger.debug("suppressed before change")
+    set_log_level("DEBUG")
+    logger.debug("visible after change")
+
+    captured = capsys.readouterr()
+    output = captured.err + captured.out
+    assert "suppressed before change" not in output
+    assert "visible after change" in output
+
+
+def test_set_log_level_rejects_unrecognized_level_and_leaves_level_unchanged():
+    configure_logging("INFO")
+
+    with pytest.raises(ValueError):
+        set_log_level("VERBOSE")
+
+    assert logging.getLogger().level == logging.INFO
+
+
+def test_configure_logging_rejects_unrecognized_level():
+    with pytest.raises(ValueError):
+        configure_logging("VERBOSE")

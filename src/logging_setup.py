@@ -1,11 +1,9 @@
 """Minimal application logging setup.
 
 Per openspec/specs/overview.md section 5.5, logs must be structured JSON
-to stdout, and the level must be configurable via LOG_LEVEL. This is
-intentionally small: just enough for the rate-limit and authorization-
-failure WARNING-level log lines this project needs right now. It does
-NOT implement the runtime-changeable-via-admin-API part of section 5.5 —
-that remains a separate, deferred change.
+to stdout, and the level must be configurable via LOG_LEVEL at startup
+and at runtime via the admin API (see src/api/admin.py: create_admin_router,
+which calls set_log_level() below).
 """
 
 from __future__ import annotations
@@ -13,6 +11,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+
+VALID_LOG_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR"}
 
 
 class JsonFormatter(logging.Formatter):
@@ -26,6 +26,14 @@ class JsonFormatter(logging.Formatter):
             "message": record.getMessage(),
         }
         return json.dumps(payload)
+
+
+def set_log_level(level: str) -> None:
+    """Change the root logger's level immediately. Raises ValueError if unrecognized."""
+    normalized = level.upper()
+    if normalized not in VALID_LOG_LEVELS:
+        raise ValueError(f"unrecognized log level: {level!r}")
+    logging.getLogger().setLevel(normalized)
 
 
 def configure_logging(default_level: str = "INFO") -> None:
@@ -44,4 +52,4 @@ def configure_logging(default_level: str = "INFO") -> None:
 
     root_logger = logging.getLogger()
     root_logger.handlers = [handler]
-    root_logger.setLevel(level)
+    set_log_level(level)

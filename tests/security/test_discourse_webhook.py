@@ -62,6 +62,7 @@ def app_client(tmp_path, monkeypatch):
     monkeypatch.setenv("DISCOURSE_API_KEY", "dummy-discourse-api-key")
     monkeypatch.setenv("DISCOURSE_API_USERNAME", "dummy-discourse-api-username")
     monkeypatch.setenv("DISCOURSE_WORKFLOW_SECRET", WEBHOOK_SECRET)
+    monkeypatch.setenv("ADMIN_API_TOKEN", "dummy-admin-token")
 
     sys.modules.pop("src.main", None)
     main = importlib.import_module("src.main")

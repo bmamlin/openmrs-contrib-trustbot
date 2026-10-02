@@ -27,6 +27,7 @@ See also [CLAUDE.md](CLAUDE.md) for AI-assistant context on this codebase.
 | `GET` | `/health` | Health check (Docker/monitoring) |
 | `POST` | `/slack/commands` | Slack slash commands — `/trust`, `/revoke`, `/trust-status` |
 | `POST` | `/webhook/discourse` | Discourse Workflow trust-level trigger (HMAC-signed; see [Manual testing](#manual-testing)) |
+| `POST` | `/admin/log-level` | Change the running log level at runtime (see [Change the log level at runtime](#change-the-log-level-at-runtime)) |
 
 ## Requirements
 
@@ -193,12 +194,33 @@ naturally). Your configured Workflow should fire, and you should see the
 appropriate groups added to the `test2` account in Keycloak — check
 `data/audit.db` (as above) for a `discourse_trust_level` row to confirm.
 
+### Change the log level at runtime
+
+`POST /admin/log-level?level=<LEVEL>` changes the running service's log
+level without a restart. `<LEVEL>` is one of `DEBUG`, `INFO`, `WARNING`,
+or `ERROR`, passed as a query parameter (not in the request body).
+
+Authorization is a standard bearer token in the `Authorization` header,
+set to your `.env`'s `ADMIN_API_TOKEN` value — not the body, and not a
+custom header:
+
+```bash
+curl -X POST "http://localhost:8080/admin/log-level?level=DEBUG" \
+  -H "Authorization: Bearer $ADMIN_API_TOKEN"
+```
+
+A successful request responds with the newly active level, e.g.
+`{"level": "DEBUG"}`. A missing or incorrect token gets `401`; an
+unrecognized level name gets `400` and leaves the current level
+unchanged. Set `admin.require_auth: false` in `config.yaml` to skip the
+token check entirely (local development only — never in production).
+
 ## Status
 
 The rules engine core, the Slack `/trust`/`/revoke`/`/trust-status`
-commands, the Discourse trust-level webhook trigger, and the audit log
-are implemented and tested. Rate limiting, the admin log-level API, and
-dry-run mode remain stubbed out. See
+commands, the Discourse trust-level webhook trigger, the audit log, rate
+limiting, and the admin log-level API are implemented and tested.
+Dry-run mode remains stubbed out. See
 [openspec/specs/overview.md](openspec/specs/overview.md) for the full
 functional and security requirements this project is being built against,
 and [CLAUDE.md](CLAUDE.md) for a more detailed current-state summary.
