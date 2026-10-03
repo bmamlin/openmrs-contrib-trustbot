@@ -16,22 +16,17 @@
 discourse:
   base_url: "https://talk.openmrs.org"
 
-  webhook:
-    # Duration (in seconds) within which a webhook payload timestamp must fall
-    # to be accepted. Payloads outside this window are rejected as potential
-    # replays. Overridable via DISCOURSE_REPLAY_WINDOW_SECONDS.
-    replay_window_seconds: 300       # default: 5 minutes
-
-    # The expected value of the X-Discourse-Workflow header on incoming
-    # webhook requests — the name/label chosen when configuring the
-    # Discourse Workflow on the community's Discourse instance (not a
-    # Discourse-defined constant). Requests with any other value are
-    # rejected.
-    workflow_name: "trusted"
-
   # Discourse API credentials are supplied via environment variables:
   #   DISCOURSE_API_KEY
   #   DISCOURSE_API_USERNAME
+  #
+  # Webhook/Workflow signature verification secrets are supplied via:
+  #   DISCOURSE_WEBHOOK_SECRET    (native Discourse webhooks)
+  #   DISCOURSE_WORKFLOW_SECRET   (Discourse Workflow HTTP action steps)
+  #
+  # Which specific webhook events or workflow names are acted on is
+  # declared in rules.yaml (type: webhook / type: workflow triggers),
+  # not here.
 
 # -----------------------------------------------------------------------------
 # Keycloak integration

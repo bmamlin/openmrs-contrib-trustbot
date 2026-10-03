@@ -29,22 +29,18 @@ needed for documentation purposes only.
 discourse:
   base_url: "https://talk.openmrs.org"
 
-  webhook:
-    # Duration (in seconds) within which a webhook payload timestamp must fall
-    # to be accepted. Payloads outside this window are rejected as potential
-    # replays. Overridable via env var DISCOURSE_REPLAY_WINDOW_SECONDS.
-    replay_window_seconds: 300       # default: 5 minutes
-
-    # The expected value of the X-Discourse-Workflow header on incoming
-    # webhook requests — the name/label chosen when configuring the
-    # Discourse Workflow on the community's Discourse instance (not a
-    # Discourse-defined constant). Requests with any other value are
-    # rejected.
-    workflow_name: "trusted"
-
   # Discourse API credentials are supplied via environment variables:
   #   DISCOURSE_API_KEY
   #   DISCOURSE_API_USERNAME
+  #
+  # Webhook/Workflow signature verification secrets are supplied via:
+  #   DISCOURSE_WEBHOOK_SECRET    (native Discourse webhooks)
+  #   DISCOURSE_WORKFLOW_SECRET   (Discourse Workflow HTTP action steps)
+  #
+  # Which specific webhook event types or workflow names are acted on —
+  # and what action each one triggers — is declared in rules.yaml
+  # (type: webhook / type: workflow triggers), not here. Any name a rule
+  # references is accepted; there is no single hardcoded name.
 
 # -----------------------------------------------------------------------------
 # Keycloak integration
@@ -163,21 +159,37 @@ rules:
 
   # ---------------------------------------------------------------------------
   # Automatically grant community edit access when a user reaches
-  # Discourse Trust Level 2.
+  # Discourse Trust Level 2, via the "trusted" Discourse Workflow. Any
+  # workflow name referenced here is accepted — there is no single
+  # hardcoded name (see "Webhook and Workflow triggers" below).
   # ---------------------------------------------------------------------------
   - name: "Grant community edit access (Discourse TL2)"
     enabled: true
     triggers:
-      - type: discourse_trust_level
-        threshold: 2              # fires when trust level reaches exactly this value
-                                  # (not on every event at or above threshold — 
-                                  # idempotency in the action handles re-runs)
+      - type: workflow
+        name: "trusted"
     actions:
       - type: keycloak_add_groups
         groups:
           - jira-users
           - jira-trunk-developer
           - confluence-users
+
+  # ---------------------------------------------------------------------------
+  # Alternative: the same grant via Discourse's native `user_promoted`
+  # webhook event instead of a Workflow.
+  # ---------------------------------------------------------------------------
+  # - name: "Grant community edit access (user_promoted webhook)"
+  #   enabled: true
+  #   triggers:
+  #     - type: webhook
+  #       name: "user_promoted"
+  #   actions:
+  #     - type: keycloak_add_groups
+  #       groups:
+  #         - jira-users
+  #         - jira-trunk-developer
+  #         - confluence-users
 
   # ---------------------------------------------------------------------------
   # Manually grant community edit access via Slack /trust command.
@@ -218,7 +230,8 @@ These are never stored in YAML files.
 
 | Variable | Required | Description |
 |---|---|---|
-| `DISCOURSE_WORKFLOW_SECRET` | Yes | Shared secret used to verify the Discourse Workflow's HTTP action signature (`X-Discourse-Workflow-Secret`) |
+| `DISCOURSE_WORKFLOW_SECRET` | Yes | Shared secret used to verify every Discourse Workflow's HTTP action signature (`X-Discourse-Workflow-Secret`) — not scoped to one workflow name; which names are acted on is declared in `rules.yaml` |
+| `DISCOURSE_WEBHOOK_SECRET` | Yes | Shared secret used to verify native Discourse webhook signatures (`X-Discourse-Event-Signature`) — which event types are acted on is declared in `rules.yaml` |
 | `DISCOURSE_API_KEY` | Yes | Discourse API key for read access (used by `/trust-status`) |
 | `DISCOURSE_API_USERNAME` | Yes | Discourse username associated with the API key |
 | `KEYCLOAK_CLIENT_ID` | Yes | Client ID for the Trust Bot service account in Keycloak |
@@ -227,7 +240,6 @@ These are never stored in YAML files.
 | `SLACK_SIGNING_SECRET` | Yes | Slack signing secret for request verification |
 | `ADMIN_API_TOKEN` | Yes | Bearer token for the admin API endpoints |
 | `LOG_LEVEL` | No | Overrides `logging.level` in `config.yaml` if set |
-| `DISCOURSE_REPLAY_WINDOW_SECONDS` | No | Overrides `discourse.webhook.replay_window_seconds` if set |
 | `DRY_RUN` | No | Overrides `dry_run` in `config.yaml` if set (`true`/`false`, case-insensitive) |
 
 ---
@@ -262,8 +274,8 @@ future extension and should be accommodated in the schema by adding a
 triggers:
   match: all    # all | any (default: any)
   conditions:
-    - type: discourse_trust_level
-      threshold: 2
+    - type: workflow
+      name: trusted
     - type: github_contribution
       min_commits: 1
 ```
@@ -273,11 +285,32 @@ Each rule has an `enabled: true/false` flag, allowing a rule to be
 temporarily disabled without deleting it — useful for testing or pausing
 a rule during an incident.
 
-### Threshold semantics for `discourse_trust_level`
-The trigger fires when a user's trust level change event reports the
-threshold value or above. Because actions are idempotent, firing on every
-event at or above threshold (rather than only on the exact transition) is
-safe and simpler to reason about.
+### Webhook and Workflow triggers: matched by `type` + `name` only
+`type: webhook` (a native Discourse webhook, identified by its
+`X-Discourse-Event` header) and `type: workflow` (a Discourse
+Workflow's HTTP action, identified by its `X-Discourse-Workflow` header)
+both match purely on `name` equality — no payload-content matching.
+There is no single hardcoded accepted name for either type; any name a
+rule references is accepted. Payload/header *content* matching (e.g. a
+future `condition` field evaluating something like
+`"old_trust_level < 2 && new_trust_level >= 2"`) is explicitly deferred
+— not needed today, since every configured trigger source already
+fires only for the event this service should act on.
+
+A `type: webhook` event name needs a parser registered in
+`src/triggers/discourse_webhook.py` before it can be used (Discourse
+defines that payload shape, not this project); an event name received
+with no registered parser is acknowledged (HTTP 200) and ignored, not
+treated as an error. A registered parser that cannot resolve a target
+OpenMRS ID from the payload instead rejects with HTTP 400 — a real
+error, logged, not a silent no-op. (Discourse's `user_badge_granted`/
+`user_badge_revoked` webhook payloads currently carry only a numeric
+user ID, never a username — there's an open Discourse Meta request to
+add it; until then, a rule using either trigger will reject every
+request with a clear "missing username" error rather than silently do
+nothing, and will start working automatically once Discourse adds the
+field.) A `type: workflow` payload just needs a top-level `username`
+field — the Workflow author controls the rest of the shape.
 
 ### Sensitive data in YAML
 YAML files are committed to version control. They must never contain secrets.

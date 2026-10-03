@@ -14,9 +14,6 @@ from fastapi.testclient import TestClient
 CONFIG_YAML = """
 discourse:
   base_url: "https://talk.openmrs.org"
-  webhook:
-    replay_window_seconds: 300
-    workflow_name: "trusted"
 keycloak:
   base_url: "https://id-new.openmrs.org"
   realm: "OpenMRS"
@@ -50,6 +47,7 @@ def app_client(tmp_path, monkeypatch):
     monkeypatch.setenv("DISCOURSE_API_KEY", "dummy-discourse-api-key")
     monkeypatch.setenv("DISCOURSE_API_USERNAME", "dummy-discourse-api-username")
     monkeypatch.setenv("DISCOURSE_WORKFLOW_SECRET", "dummy-workflow-secret")
+    monkeypatch.setenv("DISCOURSE_WEBHOOK_SECRET", "dummy-webhook-secret")
     monkeypatch.setenv("ADMIN_API_TOKEN", "dummy-admin-token")
 
     sys.modules.pop("src.main", None)
@@ -68,42 +66,9 @@ def test_app_starts_and_health_check_returns_200(app_client):
     assert response.json() == {"status": "ok"}
 
 
-def test_app_starts_when_discourse_replay_window_env_var_is_blank(tmp_path, monkeypatch):
-    # Regression test: `dotenv run` exports every key declared in .env, even
-    # ones left blank (e.g. "DISCOURSE_REPLAY_WINDOW_SECONDS="), as an
-    # actual empty-string env var -- not an absent one. os.environ.get()
-    # only falls back to its default for a truly-absent key, so a naive
-    # `int(os.environ.get("X", default))` crashes on int('') when X="".
-    config_path = tmp_path / "config.yaml"
-    config_path.write_text(CONFIG_YAML.format(db_path=tmp_path / "audit.db"))
-
-    monkeypatch.setenv("CONFIG_PATH", str(config_path))
-    monkeypatch.setenv("KEYCLOAK_CLIENT_ID", "dummy-client-id")
-    monkeypatch.setenv("KEYCLOAK_CLIENT_SECRET", "dummy-client-secret")
-    monkeypatch.setenv("SLACK_BOT_TOKEN", "xoxb-dummy-token")
-    monkeypatch.setenv("SLACK_SIGNING_SECRET", "dummy-signing-secret")
-    monkeypatch.setenv("DISCOURSE_API_KEY", "dummy-discourse-api-key")
-    monkeypatch.setenv("DISCOURSE_API_USERNAME", "dummy-discourse-api-username")
-    monkeypatch.setenv("DISCOURSE_WORKFLOW_SECRET", "dummy-workflow-secret")
-    monkeypatch.setenv("DISCOURSE_REPLAY_WINDOW_SECONDS", "")
-    monkeypatch.setenv("ADMIN_API_TOKEN", "dummy-admin-token")
-
-    sys.modules.pop("src.main", None)
-    main = importlib.import_module("src.main")
-    try:
-        with TestClient(main.app) as client:
-            response = client.get("/health")
-    finally:
-        sys.modules.pop("src.main", None)
-
-    assert response.status_code == 200
-    assert main.app.state.audit_conn is not None
-
-
 def test_blank_dry_run_env_var_falls_back_to_config_value(tmp_path, monkeypatch):
-    # Mirrors the DISCOURSE_REPLAY_WINDOW_SECONDS blank-env-var regression
-    # test: `dotenv run` exports every declared .env key, even blank ones,
-    # as an actual empty-string env var -- not an absent one.
+    # Regression test: `dotenv run` exports every declared .env key, even
+    # blank ones, as an actual empty-string env var -- not an absent one.
     config_path = tmp_path / "config.yaml"
     config_path.write_text(CONFIG_YAML.format(db_path=tmp_path / "audit.db") + "dry_run: true\n")
 
@@ -115,6 +80,7 @@ def test_blank_dry_run_env_var_falls_back_to_config_value(tmp_path, monkeypatch)
     monkeypatch.setenv("DISCOURSE_API_KEY", "dummy-discourse-api-key")
     monkeypatch.setenv("DISCOURSE_API_USERNAME", "dummy-discourse-api-username")
     monkeypatch.setenv("DISCOURSE_WORKFLOW_SECRET", "dummy-workflow-secret")
+    monkeypatch.setenv("DISCOURSE_WEBHOOK_SECRET", "dummy-webhook-secret")
     monkeypatch.setenv("ADMIN_API_TOKEN", "dummy-admin-token")
     monkeypatch.setenv("DRY_RUN", "")
 
@@ -138,6 +104,7 @@ def test_dry_run_env_var_overrides_config_value(tmp_path, monkeypatch):
     monkeypatch.setenv("DISCOURSE_API_KEY", "dummy-discourse-api-key")
     monkeypatch.setenv("DISCOURSE_API_USERNAME", "dummy-discourse-api-username")
     monkeypatch.setenv("DISCOURSE_WORKFLOW_SECRET", "dummy-workflow-secret")
+    monkeypatch.setenv("DISCOURSE_WEBHOOK_SECRET", "dummy-webhook-secret")
     monkeypatch.setenv("ADMIN_API_TOKEN", "dummy-admin-token")
     monkeypatch.setenv("DRY_RUN", "true")
 
@@ -164,6 +131,7 @@ def test_app_fails_to_start_when_admin_auth_required_but_token_is_blank(tmp_path
     monkeypatch.setenv("DISCOURSE_API_KEY", "dummy-discourse-api-key")
     monkeypatch.setenv("DISCOURSE_API_USERNAME", "dummy-discourse-api-username")
     monkeypatch.setenv("DISCOURSE_WORKFLOW_SECRET", "dummy-workflow-secret")
+    monkeypatch.setenv("DISCOURSE_WEBHOOK_SECRET", "dummy-webhook-secret")
     monkeypatch.delenv("ADMIN_API_TOKEN", raising=False)
 
     sys.modules.pop("src.main", None)

@@ -73,19 +73,13 @@ discourse_client = discourse_integration.build_client(
 discourse_integration.set_client(discourse_client)
 app.state.discourse_client = discourse_client
 
-_replay_window_override = os.environ.get("DISCOURSE_REPLAY_WINDOW_SECONDS", "").strip()
 discourse_webhook_rate_limiter = RateLimiter(
     max_requests=config.rate_limiting.discourse_webhook.max_requests,
     window_seconds=config.rate_limiting.discourse_webhook.window_seconds,
 )
 webhooks_router = webhooks.create_webhooks_router(
-    webhook_secret=os.environ["DISCOURSE_WORKFLOW_SECRET"],
-    replay_window_seconds=(
-        int(_replay_window_override)
-        if _replay_window_override
-        else config.discourse.webhook.replay_window_seconds
-    ),
-    workflow_name=config.discourse.webhook.workflow_name,
+    webhook_secret=os.environ["DISCOURSE_WEBHOOK_SECRET"],
+    workflow_secret=os.environ["DISCOURSE_WORKFLOW_SECRET"],
     discourse_base_url=config.discourse.base_url,
     audit_conn=audit_conn,
     rate_limiter=discourse_webhook_rate_limiter,

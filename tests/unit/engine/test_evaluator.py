@@ -6,7 +6,8 @@ from src.engine.models import Action, ActionResult, Rule, RuleSet, Trigger, Trig
 def test_registries_are_populated_on_import():
     assert "slack_trust_command" in evaluator.TRIGGER_MATCHERS
     assert "slack_revoke_command" in evaluator.TRIGGER_MATCHERS
-    assert "discourse_trust_level" in evaluator.TRIGGER_MATCHERS
+    assert "webhook" in evaluator.TRIGGER_MATCHERS
+    assert "workflow" in evaluator.TRIGGER_MATCHERS
     assert "keycloak_add_groups" in evaluator.ACTION_EXECUTORS
     assert "keycloak_remove_groups" in evaluator.ACTION_EXECUTORS
 
@@ -21,7 +22,7 @@ def make_rule(name, trigger_types, *, enabled=True, action_type="keycloak_add_gr
 
 
 def test_evaluate_matches_rule_with_multiple_triggers_on_either_one():
-    rule = make_rule("multi", ["discourse_trust_level", "slack_trust_command"])
+    rule = make_rule("multi", ["workflow", "slack_trust_command"])
     rule_set = RuleSet(rules=[rule])
     event = TriggerEvent(type="slack_trust_command", openmrs_id="jdoe")
 

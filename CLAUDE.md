@@ -7,8 +7,9 @@ AI-assistant context for the OpenMRS Trust Bot repository.
 A Python/FastAPI service that automates granting and revoking OpenMRS
 community access (JIRA, Confluence via Keycloak groups) based on:
 
-- **Discourse trust level webhooks** — automatic, when a user reaches
-  trust level 2
+- **Discourse webhooks/Workflows** — automatic, named triggers declared
+  in `rules.yaml` (e.g. a `"trusted"` Discourse Workflow, or a native
+  `user_promoted` webhook event)
 - **Slack slash commands** (`/trust`, `/revoke`, `/trust-status`) — manual,
   human-in-the-loop, restricted to a designated private Slack channel
 
@@ -42,7 +43,7 @@ but the spec itself is authoritative.
 ```
 src/config.py       loads config.yaml once at startup (ServiceConfig, Pydantic)
 src/engine/         rules engine core: models (Pydantic), loader (rules.yaml), evaluator
-src/triggers/       one module per trigger type (discourse_trust_level, slack_trust_command, ...)
+src/triggers/       one module per trigger type (webhook, workflow, slack_trust_command, ...)
 src/actions/        one module per action type (keycloak_add_groups, keycloak_remove_groups)
 src/integrations/   external API clients (Keycloak, Discourse, Slack)
 src/audit/          SQLite audit log (schema.sql + db.py)
@@ -94,23 +95,43 @@ pytest
 
 The rules engine core, the Slack `/trust`, `/revoke`, and `/trust-status`
 commands, the `keycloak_add_groups` / `keycloak_remove_groups` actions, the
-Discourse trust-level webhook trigger, and the audit log are implemented
+Discourse webhook/workflow triggers, and the audit log are implemented
 and tested (see `openspec/changes/archive/`) — `/trust <openmrs-id>` and
 `/revoke <openmrs-id>` in the configured Slack channel grant/revoke
 Keycloak group access end-to-end, `/trust-status <openmrs-id>` reports
 current Keycloak groups, Discourse trust level, and recent audit history
 (read-only — it never reaches the rules engine, and degrades gracefully
-per-section if one data source is unavailable), and reaching Discourse
-trust level 2+ automatically grants the same access via `POST
-/webhook/discourse`. That webhook is fed by a **Discourse Workflow**
-configured on the community's Discourse instance (not Discourse's native
-per-event webhooks, which have no trust-level-change event at all — see
-`openspec/changes/archive/*-add-discourse-trust-level-trigger/design.md`
-for why), posting a custom-built, HMAC-signed JSON payload
-(`{old_trust_level, new_trust_level, username, timestamp}`) rather than a
-Discourse-defined format. The Discourse webhook and all three Slack
-commands are rate-limited (in-memory, per-source-IP for the webhook,
-shared per-Slack-user-ID across `/trust`/`/revoke`/`/trust-status`) via
+per-section if one data source is unavailable), and `POST
+/webhook/discourse` handles two distinct Discourse delivery mechanisms,
+dispatched by rule data rather than hardcoded in service config:
+`type: workflow, name: "<workflow-name>"` for a Discourse Workflow's
+HTTP action (identified by `X-Discourse-Workflow`, HMAC-verified via
+`DISCOURSE_WORKFLOW_SECRET` — any name a rule references is accepted,
+not a single hardcoded one), and `type: webhook, name: "<event-type>"`
+for a native Discourse webhook event (identified by
+`X-Discourse-Event`, NOT `X-Discourse-Event-Type` — confirmed via live
+capture that Type is only the coarse delivery category Discourse groups
+events under, e.g. `user_badge_granted`/`user_badge_revoked` both send
+`X-Discourse-Event-Type: user_badge`; only `X-Discourse-Event`
+distinguishes them — HMAC-verified via `DISCOURSE_WEBHOOK_SECRET`;
+supports `user_promoted` (resolves `username` directly from the
+payload's embedded serialized user, confirmed via a live capture) and
+`user_badge_granted`/`user_badge_revoked` (whose real Discourse payload
+carries only a numeric user ID, never a username, confirmed via live
+capture — there's an open Discourse Meta request to add one; until
+then, a rule using either trigger fails loudly with a logged HTTP 400
+rather than silently doing nothing, and will start working automatically
+once Discourse ships the field) via a per-event-name parser registry in
+`src/triggers/discourse_webhook.py` — an unrecognized event name is
+acknowledged, not an error). There is deliberately no replay-window
+check for either mechanism (removed — every action this service takes
+is idempotent, so re-processing a replayed request is harmless; see
+`openspec/changes/archive/*-restructure-discourse-triggers/design.md`).
+Matching on anything beyond a trigger's `type`+`name` (e.g. payload
+content, a future `condition` expression) is explicitly deferred. The
+Discourse webhook and all three Slack commands are rate-limited
+(in-memory, per-source-IP for the webhook, shared per-Slack-user-ID
+across `/trust`/`/revoke`/`/trust-status`) via
 `src/ratelimit.py: RateLimiter`, with violations and the existing
 channel-restriction rejections logged at WARNING level through a minimal
 JSON logging setup (`src/logging_setup.py`, `LOG_LEVEL` env var). The

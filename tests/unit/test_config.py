@@ -12,7 +12,7 @@ def test_load_config_parses_example_file():
 
     assert config.keycloak.realm == "OpenMRS"
     assert config.database.path == "/data/audit.db"
-    assert config.discourse.webhook.workflow_name == "trusted"
+    assert config.discourse.base_url == "https://talk.openmrs.org"
 
 
 def test_dry_run_defaults_to_false_when_absent(tmp_path):

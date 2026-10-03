@@ -26,7 +26,7 @@ See also [CLAUDE.md](CLAUDE.md) for AI-assistant context on this codebase.
 |---|---|---|
 | `GET` | `/health` | Health check (Docker/monitoring) |
 | `POST` | `/slack/commands` | Slack slash commands — `/trust`, `/revoke`, `/trust-status` |
-| `POST` | `/webhook/discourse` | Discourse Workflow trust-level trigger (HMAC-signed; see [Manual testing](#manual-testing)) |
+| `POST` | `/webhook/discourse` | Native Discourse webhooks and Discourse Workflow HTTP actions (HMAC-signed; see [Manual testing](#manual-testing)) |
 | `POST` | `/admin/log-level` | Change the running log level at runtime (see [Change the log level at runtime](#change-the-log-level-at-runtime)) |
 
 ## Requirements
@@ -113,30 +113,65 @@ setting up the Slack app.
 
 ### Set up a Discourse Workflow
 
-Discourse's native, per-event webhooks have no trust-level-change event —
-this uses a **Discourse Workflow** instead, configured on the Discourse
-instance itself (e.g. `talk.openmrs.org`), to call the service's
-`/webhook/discourse` endpoint when a user crosses trust level 2.
+A **Discourse Workflow**'s HTTP action step can call the service's
+`/webhook/discourse` endpoint for events Discourse's native webhooks
+don't cover, or when you want full control over the payload shape.
+Which workflow names matter — and what each one does — is declared in
+`rules.yaml` (`type: workflow` triggers), not hardcoded in service
+config, so any name you choose works as long as a rule references it.
 
-1. In Discourse admin, create a Workflow with:
-  * A trigger that fires when a user's trust level increases from 0 or 1
-    to 2, 3, or 4
-  * An HTTP action step posting to `https://example.ngrok-free.dev/webhook/discourse`
-    (your ngrok URL + `/webhook/discourse`) with a JSON body containing
-    `username`, `old_trust_level`, `new_trust_level`, and `timestamp`
-    (ISO 8601 UTC)
-  * A custom header `X-Discourse-Workflow` set to a name of your choosing
-    (e.g. `trusted`) — this must match `discourse.webhook.workflow_name`
-    in `config.yaml`
-  * A Code step (run before the HTTP action) that computes an
+1. In Discourse Admin > Plugins > Workflows, create a Workflow with:
+  * A trigger condition for whatever event you want to react to (e.g.
+    a user's trust level increasing from 0 or 1 to 2, 3, or 4)
+  * A Code step (run before the HTTP request) that computes an
     HMAC-SHA256 signature of the request body, using a secret set as a
     workflow variable, and adds it as a custom header
-    `X-Discourse-Workflow-Secret: sha256=<hex-digest>`
-2. Pick a secret for that Code step's HMAC key — this is the value
-   you'll set as `DISCOURSE_WORKFLOW_SECRET` below.
+    `X-Discourse-Workflow-Secret: sha256=<hex-digest>`. See 
+    [here](https://meta.discourse.org/t/could-usernames-be-included-in-user-badge-webhook-payload/413448/16?u=burke) 
+    for a description.
+  * An HTTP request step POSTing to `https://example.ngrok-free.dev/webhook/discourse`
+    (your ngrok URL + `/webhook/discourse`) with a JSON body that
+    includes at minimum a top-level `username` field (required — this
+    is the target OpenMRS ID); include whatever else your rule's
+    action needs
+  * A custom header `X-Discourse-Workflow-Secret` with value `{{ $("Code").item.json.signature }}`
+  * A custom header `X-Discourse-Workflow` set to a name of your
+    choosing (e.g. `trusted`) — this is the `name` your `rules.yaml`
+    trigger (`type: workflow, name: "trusted"`) matches against
+  * Content type `JSON`
+  * Request body set to `{{ $("Code").item.json.payload }}`
+  * Never error toggled on
+2. Pick a secret for that Code step's HMAC key. Set this as the value
+   of a Workflow variable with key `secret` and use the same 
+   value as `DISCOURSE_WORKFLOW_SECRET` below (shared across every
+   workflow name you configure, not scoped to one).
 
-See [the add-discourse-trust-level-trigger design doc](openspec/changes/archive/2026-10-02-add-discourse-trust-level-trigger/design.md)
-for the full rationale and exact payload/header shape this service expects.
+### Set up a native Discourse webhook
+
+For event types Discourse already emits natively (`user_promoted`,
+`user_badge_granted`, `user_badge_revoked`), a native webhook needs no
+Workflow at all.
+
+> [!NOTE]
+> `user_badge_granted`/`user_badge_revoked` currently fail with a
+> logged HTTP 400 — Discourse's payload for these two only carries a
+> numeric user ID, never a username, so there's no way to resolve a
+> target OpenMRS ID yet. There's an open Discourse Meta request to add
+> one; `user_promoted` already works today since its payload includes
+> the full serialized user.
+
+1. In Discourse admin (Admin > Advanced > Webhooks), create a webhook:
+  * Payload URL: your ngrok URL + `/webhook/discourse`
+  * Secret: pick a value — this is what you'll set as
+    `DISCOURSE_WEBHOOK_SECRET` below (shared across every event type
+    you select, not scoped to one)
+  * Under event types, select whichever of the three supported events
+    you want (e.g. "user promoted")
+2. Reference that event's name in `rules.yaml` as a `type: webhook`
+   trigger, e.g. `type: webhook, name: "user_promoted"`.
+
+See [the restructure-discourse-triggers design doc](openspec/changes/archive/2026-10-03-restructure-discourse-triggers/design.md)
+for the full rationale behind this two-mechanism model.
 
 ### Prepare test environment
 
@@ -145,16 +180,17 @@ for the full rationale and exact payload/header shape this service expects.
   * SLACK_BOT_TOKEN={Bot User OAuth Token}
   * SLACK_SIGNING_SECRET={Signing Secret}
   * DISCOURSE_WORKFLOW_SECRET={the secret used in the Workflow's Code step}
+  * DISCOURSE_WEBHOOK_SECRET={the secret set when creating the native webhook}
   * CONFIG_PATH=./config/config.yaml
   * RULES_PATH=./config/rules.yaml
 2. Copy `config/config.example.yaml` to `config/config.yaml` and set:
   * `keycloak.base_url`: "http://localhost:8090"
   * `keycloak.realm`: "master"
   * `slack.trusted_channel_id`: "{Slack Channel ID}"
-  * `discourse.webhook.workflow_name`: the `X-Discourse-Workflow` value
-    you chose above (e.g. "trusted")
   * `database.path`: "./data/audit.db"
-3. Copy `config/rules.example.yaml` to `config/rules.yaml`
+3. Copy `config/rules.example.yaml` to `config/rules.yaml` — its default
+   `type: workflow, name: "trusted"` rule already matches the Workflow
+   name chosen above
 
 ### Start the trustbot service
 
@@ -183,16 +219,23 @@ You can view logged events with:
 sqlite3 data/audit.db "select * from audit_log;"
 ```
 
-### Test the Discourse trust-level trigger
+### Test the Discourse Workflow trigger
 
 Verify groups for user `test2` in Keycloak is an empty list, and that
 `test2` also exists as a Discourse user on your Discourse instance (its
-username must match the Keycloak username exactly). Raise `test2`'s
-Discourse trust level from below 2 to 2 or above (e.g. via the Discourse
-admin console, or by meeting the trust level 2 activity requirements
-naturally). Your configured Workflow should fire, and you should see the
-appropriate groups added to the `test2` account in Keycloak — check
-`data/audit.db` (as above) for a `discourse_trust_level` row to confirm.
+username must match the Keycloak username exactly). Trigger whatever
+condition your Workflow's trigger step is configured for (e.g. raising
+`test2`'s Discourse trust level from below 2 to 2 or above). Your
+configured Workflow should fire, and you should see the appropriate
+groups added to the `test2` account in Keycloak — check `data/audit.db`
+(as above) for a `workflow` row to confirm.
+
+### Test a native Discourse webhook
+
+Using the native webhook set up above (e.g. for `user_promoted`),
+trigger the corresponding Discourse action for a test user whose
+username matches a Keycloak account. Check `data/audit.db` for a
+`webhook` row with the matching event name to confirm.
 
 ### Change the log level at runtime
 
@@ -233,10 +276,10 @@ which should show `dry_run` rather than `success`. Set `DRY_RUN=false`
 ## Status
 
 The rules engine core, the Slack `/trust`/`/revoke`/`/trust-status`
-commands, the Discourse trust-level webhook trigger, the audit log, rate
-limiting, the admin log-level API, and dry-run mode are all implemented
-and tested — every item in the project spec's Functional and Security
-Requirements checklists is now built. See
+commands, the Discourse `webhook`/`workflow` triggers, the audit log,
+rate limiting, the admin log-level API, and dry-run mode are all
+implemented and tested — every item in the project spec's Functional and
+Security Requirements checklists is now built. See
 [openspec/specs/overview.md](openspec/specs/overview.md) for the full
 functional and security requirements this project is being built against,
 and [CLAUDE.md](CLAUDE.md) for a more detailed current-state summary.

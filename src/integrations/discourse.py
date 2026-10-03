@@ -2,10 +2,11 @@
 
 Used for read access in support of `/trust-status` (current trust level
 lookup) via DISCOURSE_API_KEY / DISCOURSE_API_USERNAME against
-discourse.base_url (config.yaml). Webhook signature verification and
-payload parsing for the `discourse_trust_level` trigger live in
-src/api/webhooks.py and src/triggers/discourse.py, not here — this module
-is only the outbound API client.
+discourse.base_url (config.yaml). Webhook/Workflow signature verification
+and payload parsing for the `webhook`/`workflow` triggers live in
+src/api/webhooks.py and src/triggers/discourse_webhook.py /
+discourse_workflow.py, not here — this module is only the outbound API
+client.
 
 Unlike src/integrations/keycloak.py, calls here are NOT retried on
 failure: /trust-status degrades gracefully by showing this section as

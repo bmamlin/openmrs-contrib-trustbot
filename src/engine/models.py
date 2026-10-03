@@ -16,12 +16,12 @@ from pydantic import BaseModel, ConfigDict
 
 
 class Trigger(BaseModel):
-    """A single trigger condition within a rule (e.g. discourse_trust_level)."""
+    """A single trigger condition within a rule (e.g. webhook, workflow)."""
 
     model_config = ConfigDict(extra="allow")
 
     type: str
-    # Trigger-specific parameters (e.g. `threshold`, `channel`) are captured
+    # Trigger-specific parameters (e.g. `name`, `channel`) are captured
     # via pydantic's extra-fields support rather than a rigid schema, since
     # each trigger type defines its own parameters.
 
@@ -60,6 +60,7 @@ class TriggerEvent(BaseModel):
     """
 
     type: str                    # matches a Trigger.type, e.g. "slack_trust_command"
+    name: str | None = None      # matches a Trigger.name, e.g. "trusted" or "user_promoted"
     openmrs_id: str              # target user
     source: str | None = None    # e.g. the issuing Slack username
     payload: dict[str, Any] = {}

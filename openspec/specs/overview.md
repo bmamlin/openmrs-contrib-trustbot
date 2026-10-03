@@ -68,8 +68,8 @@ The service is built around a simple, declarative **rules engine**: a collection
 rules:
   - name: "Grant community edit access at Discourse TL2"
     triggers:
-      - type: discourse_trust_level
-        threshold: 2        # Discourse trust level ≥ 2
+      - type: workflow            # a Discourse Workflow's HTTP action
+        name: "trusted"           # matched against X-Discourse-Workflow
     actions:
       - type: keycloak_add_groups
         groups: [jira-users, jira-trunk-developer, confluence-users]
@@ -100,7 +100,8 @@ YAML files are loaded from the mounted `/config/` directory. See the [YAML Confi
 
 | Trigger Type | Description | Status |
 |---|---|---|
-| `discourse_trust_level` | Discourse user reaches a minimum trust level (0–4) | **In scope (MVP)** |
+| `workflow` | A named Discourse Workflow's HTTP action fires (matched by `name`, e.g. `"trusted"`) | **In scope (MVP)** |
+| `webhook` | A named native Discourse webhook event fires (matched by `name`, e.g. `"user_promoted"`) | **In scope (MVP)** |
 | `slack_trust_command` | Trusted member issues `/trust <openmrs-id>` in designated Slack channel | **In scope (MVP)** |
 | `slack_revoke_command` | Trusted member issues `/revoke <openmrs-id>` in designated Slack channel | **In scope (MVP)** |
 | `github_contribution` | User meets a contribution threshold in a GitHub org/repo | Future |
@@ -155,12 +156,26 @@ If a rule fires but produces no change (e.g. `/trust` is issued for a user who a
 
 ### 5.2 Discourse Monitoring
 
-- [ ] Expose a FastAPI POST endpoint to receive Discourse webhook events
-- [ ] Verify Discourse webhook signature on every incoming request before any processing; reject unsigned or invalid requests with HTTP 403
-- [ ] Reject webhook payloads with a timestamp outside the configured replay window (default: 5 minutes); window is configurable via environment variable
-- [ ] Handle trust level change event payloads; ignore unrelated event types gracefully
-- [ ] On a valid trust level change event, evaluate all rules whose criteria include `discourse_trust_level`
-- [ ] Username from Discourse event is used directly as the OpenMRS ID / Keycloak username
+- [ ] Expose a FastAPI POST endpoint to receive both native Discourse
+      webhook events and Discourse Workflow HTTP action payloads
+- [ ] Verify each request's signature on every incoming request before
+      any processing (`X-Discourse-Event-Signature` for native
+      webhooks, `X-Discourse-Workflow-Secret` for Workflows); reject
+      unsigned or invalid requests with HTTP 403
+- [ ] Route to a rule by the event/workflow's `name` (from
+      `X-Discourse-Event` or `X-Discourse-Workflow`), declared in
+      `rules.yaml` as `type: webhook`/`type: workflow` triggers — not a
+      single hardcoded name in service config. An event/workflow name
+      no rule references is acknowledged (HTTP 200) and ignored, not
+      an error.
+      Deliberately **not implemented**: replay-window/staleness
+      rejection. Removed by design (see
+      `openspec/changes/archive/*-restructure-discourse-triggers/design.md`)
+      — every action this service takes is idempotent, so re-processing
+      a replayed request is harmless; this is a considered trade-off,
+      not an oversight.
+- [ ] Username from the resolved payload is used directly as the
+      OpenMRS ID / Keycloak username
 
 ### 5.3 Slack Integration
 
@@ -207,7 +222,7 @@ CREATE TABLE audit_log (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     timestamp   TEXT    NOT NULL,          -- ISO 8601 UTC
     openmrs_id  TEXT    NOT NULL,          -- target user
-    trigger     TEXT    NOT NULL,          -- e.g. 'discourse_trust_level', 'slack_trust_command'
+    trigger     TEXT    NOT NULL,          -- e.g. 'workflow', 'webhook', 'slack_trust_command'
     trigger_src TEXT,                      -- e.g. Slack username, Discourse webhook URL
     rule_name   TEXT    NOT NULL,          -- matched rule name from YAML
     action      TEXT    NOT NULL,          -- e.g. 'keycloak_add_groups'
@@ -251,9 +266,9 @@ Security is a primary concern given the service directly controls privilege esca
 
 ### 6.3 Input Validation
 
-- [ ] All external inputs (Slack payloads, Discourse webhook payloads) validated and sanitized before processing
+- [ ] All external inputs (Slack payloads, Discourse webhook/Workflow payloads) validated and sanitized before processing
 - [ ] OpenMRS IDs received from external sources validated to exist in Keycloak before any action is taken
-- [ ] Webhook replay protection: reject Discourse webhook payloads with timestamps outside the configured window (default: 5 minutes); configurable via environment variable
+- [ ] ~~Webhook replay protection~~ **Deliberately not implemented**: every action this service takes is idempotent, so re-processing a replayed or duplicate Discourse request is harmless. Signature verification (above) remains the actual authentication control.
 
 ### 6.4 Rate Limiting
 
@@ -266,7 +281,7 @@ Security is a primary concern given the service directly controls privilege esca
 
 - [ ] Unit tests for all trigger parsers, rule evaluation logic, and action executors
 - [ ] Integration tests covering the end-to-end rule evaluation pipeline
-- [ ] Specific security-focused tests for: unauthorized Slack channel, malformed payloads, replay attacks on webhooks, rate limit enforcement, requests for non-existent OpenMRS IDs
+- [ ] Specific security-focused tests for: unauthorized Slack channel, malformed payloads, invalid Discourse webhook/Workflow signatures, rate limit enforcement, requests for non-existent OpenMRS IDs
 - [ ] A **dry-run / simulation mode** in which all rule actions are evaluated and logged but no changes are made to external systems (Keycloak, etc.)
 
 ### 6.6 Observability
@@ -300,7 +315,7 @@ Security is a primary concern given the service directly controls privilege esca
 7. ~~**Rollback / revocation**~~ **Resolved:** Manual revocation via `/revoke`, triggering `keycloak_remove_groups`. Automatic revocation and writing back to Discourse trust levels are out of scope.
 8. ~~**Preferred language/stack**~~ **Resolved:** Python 3.12+ with FastAPI, slack-bolt, python-keycloak, pydiscourse, PyYAML/strictyaml, pytest.
 9. ~~**Audit log destination**~~ **Resolved:** SQLite at `/data/audit.db` on a host-mounted Docker volume. See schema in §5.5.
-10. ~~**Discourse polling vs. webhooks**~~ **Resolved:** Discourse webhooks with signature verification and replay attack protection.
+10. ~~**Discourse polling vs. webhooks**~~ **Resolved:** Discourse webhooks and Discourse Workflow HTTP actions, both with signature verification. Replay protection was considered and deliberately not implemented — every action is idempotent, so it's unnecessary.
 
 ---
 

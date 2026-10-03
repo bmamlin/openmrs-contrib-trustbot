@@ -21,21 +21,43 @@ rules:
 
   # ---------------------------------------------------------------------------
   # Automatically grant community edit access when a user reaches
-  # Discourse Trust Level 2.
+  # Discourse Trust Level 2, via the "trusted" Discourse Workflow (its
+  # HTTP action step POSTs here with X-Discourse-Workflow: trusted).
+  # Any workflow name a rule references here is accepted — there is no
+  # single hardcoded name.
   # ---------------------------------------------------------------------------
   - name: "Grant community edit access (Discourse TL2)"
     enabled: true
     triggers:
-      - type: discourse_trust_level
-        threshold: 2              # fires when trust level reaches exactly this value
-                                  # (not on every event at or above threshold —
-                                  # idempotency in the action handles re-runs)
+      - type: workflow
+        name: "trusted"
     actions:
       - type: keycloak_add_groups
         groups:
           - jira-users
           - jira-trunk-developer
           - confluence-users
+
+  # ---------------------------------------------------------------------------
+  # Alternative: the same grant, via Discourse's native `user_promoted`
+  # webhook event instead of a Workflow — no Workflow configuration
+  # needed, just a webhook created in Discourse's admin UI (Admin > API
+  # > Webhooks) selecting the "user_promoted" event. Commented out by
+  # default so it doesn't duplicate the Workflow-based rule above; the
+  # action is idempotent, so enabling both at once is harmless, just
+  # redundant.
+  # ---------------------------------------------------------------------------
+  # - name: "Grant community edit access (user_promoted webhook)"
+  #   enabled: true
+  #   triggers:
+  #     - type: webhook
+  #       name: "user_promoted"
+  #   actions:
+  #     - type: keycloak_add_groups
+  #       groups:
+  #         - jira-users
+  #         - jira-trunk-developer
+  #         - confluence-users
 
   # ---------------------------------------------------------------------------
   # Manually grant community edit access via Slack /trust command.

@@ -19,9 +19,6 @@ ADMIN_API_TOKEN = "test-admin-token"
 CONFIG_YAML = """
 discourse:
   base_url: "https://talk.openmrs.org"
-  webhook:
-    replay_window_seconds: 300
-    workflow_name: "trusted"
 keycloak:
   base_url: "https://id-new.openmrs.org"
   realm: "OpenMRS"
@@ -52,6 +49,7 @@ def app_client(tmp_path, monkeypatch):
     monkeypatch.setenv("DISCOURSE_API_KEY", "dummy-discourse-api-key")
     monkeypatch.setenv("DISCOURSE_API_USERNAME", "dummy-discourse-api-username")
     monkeypatch.setenv("DISCOURSE_WORKFLOW_SECRET", "dummy-workflow-secret")
+    monkeypatch.setenv("DISCOURSE_WEBHOOK_SECRET", "dummy-webhook-secret")
     monkeypatch.setenv("ADMIN_API_TOKEN", ADMIN_API_TOKEN)
 
     sys.modules.pop("src.main", None)

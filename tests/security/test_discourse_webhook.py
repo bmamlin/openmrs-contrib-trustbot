@@ -3,9 +3,11 @@
 Mirrors test_slack_trust_command.py, but through the real app (src.main)
 rather than an isolated router, to confirm the full wiring (config +
 env vars + mounted route) rejects as expected. Per the
-discourse-trust-level-trigger spec: signature verification happens before
-anything else (403), and a request with the wrong workflow name is
-rejected (400) before any downstream processing.
+discourse-webhook-trigger and discourse-workflow-trigger specs: signature
+verification happens before anything else (403) for both delivery
+mechanisms, and an unrecognized workflow name is no longer a rejection —
+any name a rule references is accepted (see
+test_valid_signature_with_unreferenced_workflow_name_matches_nothing).
 """
 
 import hashlib
@@ -13,7 +15,7 @@ import hmac
 import importlib
 import json
 import sys
-from datetime import UTC, datetime
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -21,15 +23,15 @@ from fastapi.testclient import TestClient
 
 from src.integrations import keycloak as keycloak_integration
 
+EXAMPLE_RULES = Path(__file__).parents[2] / "config" / "rules.example.yaml"
+
 WEBHOOK_SECRET = "test-webhook-secret"
+WORKFLOW_SECRET = "test-workflow-secret"
 WORKFLOW_NAME = "trusted"
 
 CONFIG_YAML = """
 discourse:
   base_url: "https://talk.openmrs.org"
-  webhook:
-    replay_window_seconds: 300
-    workflow_name: "{workflow_name}"
 keycloak:
   base_url: "https://id-new.openmrs.org"
   realm: "OpenMRS"
@@ -50,9 +52,7 @@ database:
 @pytest.fixture
 def app_client(tmp_path, monkeypatch):
     config_path = tmp_path / "config.yaml"
-    config_path.write_text(
-        CONFIG_YAML.format(workflow_name=WORKFLOW_NAME, db_path=tmp_path / "audit.db")
-    )
+    config_path.write_text(CONFIG_YAML.format(db_path=tmp_path / "audit.db"))
 
     monkeypatch.setenv("CONFIG_PATH", str(config_path))
     monkeypatch.setenv("KEYCLOAK_CLIENT_ID", "dummy-client-id")
@@ -61,8 +61,10 @@ def app_client(tmp_path, monkeypatch):
     monkeypatch.setenv("SLACK_SIGNING_SECRET", "dummy-signing-secret")
     monkeypatch.setenv("DISCOURSE_API_KEY", "dummy-discourse-api-key")
     monkeypatch.setenv("DISCOURSE_API_USERNAME", "dummy-discourse-api-username")
-    monkeypatch.setenv("DISCOURSE_WORKFLOW_SECRET", WEBHOOK_SECRET)
+    monkeypatch.setenv("DISCOURSE_WORKFLOW_SECRET", WORKFLOW_SECRET)
+    monkeypatch.setenv("DISCOURSE_WEBHOOK_SECRET", WEBHOOK_SECRET)
     monkeypatch.setenv("ADMIN_API_TOKEN", "dummy-admin-token")
+    monkeypatch.setenv("RULES_PATH", str(EXAMPLE_RULES))
 
     sys.modules.pop("src.main", None)
     main = importlib.import_module("src.main")
@@ -81,22 +83,17 @@ def mock_keycloak_client():
     return client
 
 
-def webhook_body(*, username: str = "jdoe") -> bytes:
-    payload = {
-        "username": username,
-        "old_trust_level": 1,
-        "new_trust_level": 2,
-        "timestamp": datetime.now(UTC).isoformat(),
-    }
+def workflow_body(*, username: str = "jdoe") -> bytes:
+    payload = {"username": username, "old_trust_level": 1, "new_trust_level": 2}
     return json.dumps(payload).encode()
 
 
-def sign(body: bytes, secret: str = WEBHOOK_SECRET) -> str:
+def sign(body: bytes, secret: str) -> str:
     digest = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
     return f"sha256={digest}"
 
 
-def post_webhook(client: TestClient, body: bytes, *, signature: str, workflow: str):
+def post_workflow(client: TestClient, body: bytes, *, signature: str, workflow: str):
     return client.post(
         "/webhook/discourse",
         content=body,
@@ -108,10 +105,22 @@ def post_webhook(client: TestClient, body: bytes, *, signature: str, workflow: s
     )
 
 
-def test_invalid_signature_is_rejected_before_any_processing(app_client, mock_keycloak_client):
-    body = webhook_body()
+def post_native_webhook(client: TestClient, body: bytes, *, signature: str, event_name: str):
+    return client.post(
+        "/webhook/discourse",
+        content=body,
+        headers={
+            "Content-Type": "application/json",
+            "X-Discourse-Event": event_name,
+            "X-Discourse-Event-Signature": signature,
+        },
+    )
 
-    response = post_webhook(app_client, body, signature="sha256=" + "0" * 64, workflow=WORKFLOW_NAME)
+
+def test_workflow_invalid_signature_is_rejected_before_any_processing(app_client, mock_keycloak_client):
+    body = workflow_body()
+
+    response = post_workflow(app_client, body, signature="sha256=" + "0" * 64, workflow=WORKFLOW_NAME)
 
     assert response.status_code == 403
     mock_keycloak_client.add_user_to_groups.assert_not_called()
@@ -120,10 +129,63 @@ def test_invalid_signature_is_rejected_before_any_processing(app_client, mock_ke
     assert conn.execute("SELECT COUNT(*) FROM audit_log").fetchone()[0] == 0
 
 
-def test_valid_signature_with_wrong_workflow_name_is_rejected(app_client, mock_keycloak_client):
-    body = webhook_body()
+def test_valid_signature_with_unreferenced_workflow_name_matches_nothing(app_client, mock_keycloak_client):
+    # No rule in the real example rules.yaml references this name --
+    # any workflow name is accepted at the signature layer (there is no
+    # single hardcoded one), it just matches no rule and does nothing.
+    body = workflow_body()
 
-    response = post_webhook(app_client, body, signature=sign(body), workflow="some-other-workflow")
+    response = post_workflow(app_client, body, signature=sign(body, WORKFLOW_SECRET), workflow="some-other-workflow")
+
+    assert response.status_code == 200
+    mock_keycloak_client.add_user_to_groups.assert_not_called()
+
+    conn = app_client.app.state.audit_conn
+    assert conn.execute("SELECT COUNT(*) FROM audit_log").fetchone()[0] == 0
+
+
+def test_native_webhook_invalid_signature_is_rejected_before_any_processing(app_client, mock_keycloak_client):
+    body = json.dumps({"user": {"username": "jdoe"}}).encode()
+
+    response = post_native_webhook(
+        app_client, body, signature="sha256=" + "0" * 64, event_name="user_promoted"
+    )
+
+    assert response.status_code == 403
+    mock_keycloak_client.add_user_to_groups.assert_not_called()
+
+    conn = app_client.app.state.audit_conn
+    assert conn.execute("SELECT COUNT(*) FROM audit_log").fetchone()[0] == 0
+
+
+def test_native_webhook_valid_signature_with_unsupported_event_name_takes_no_action(
+    app_client, mock_keycloak_client
+):
+    body = json.dumps({"user": {"username": "jdoe"}}).encode()
+
+    response = post_native_webhook(
+        app_client, body, signature=sign(body, WEBHOOK_SECRET), event_name="some_unsupported_event"
+    )
+
+    assert response.status_code == 200
+    mock_keycloak_client.add_user_to_groups.assert_not_called()
+
+    conn = app_client.app.state.audit_conn
+    assert conn.execute("SELECT COUNT(*) FROM audit_log").fetchone()[0] == 0
+
+
+def test_native_webhook_user_badge_granted_with_no_username_returns_400(
+    app_client, mock_keycloak_client
+):
+    # The real payload shape Discourse sends today (confirmed via live
+    # capture): no username anywhere, only a numeric user_id.
+    body = json.dumps(
+        {"user_badge": {"id": 1, "badge_id": 2, "user_id": 3569, "granted_by_id": -1}}
+    ).encode()
+
+    response = post_native_webhook(
+        app_client, body, signature=sign(body, WEBHOOK_SECRET), event_name="user_badge_granted"
+    )
 
     assert response.status_code == 400
     mock_keycloak_client.add_user_to_groups.assert_not_called()
