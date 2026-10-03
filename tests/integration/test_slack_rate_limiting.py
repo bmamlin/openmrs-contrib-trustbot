@@ -30,6 +30,13 @@ def make_middleware(tmp_path, *, max_requests, window_seconds=60):
     return custom_middleware[0].func
 
 
+class _FakeRequest:
+    """Minimal stand-in for the BoltRequest slack-bolt would inject as `request`."""
+
+    def __init__(self, headers: dict | None = None):
+        self.headers = headers or {}
+
+
 def invoke(middleware, *, user_id, command):
     acked = {}
     next_called = {"value": False}
@@ -40,7 +47,12 @@ def invoke(middleware, *, user_id, command):
     def next_func():
         next_called["value"] = True
 
-    middleware(body={"user_id": user_id, "command": command}, next=next_func, ack=ack)
+    middleware(
+        body={"user_id": user_id, "command": command},
+        next=next_func,
+        ack=ack,
+        request=_FakeRequest(),
+    )
     return acked, next_called["value"]
 
 
@@ -83,3 +95,35 @@ def test_different_users_have_independent_counters(tmp_path):
 
     assert first_user_next is True
     assert second_user_next is True
+
+
+def test_command_body_logged_at_debug_with_token_redacted_for_allowed_command(tmp_path, caplog):
+    middleware = make_middleware(tmp_path, max_requests=3)
+
+    with caplog.at_level("DEBUG"):
+        middleware(
+            body={"user_id": "U1", "command": "/trust", "token": "deprecated-verification-token"},
+            next=lambda: None,
+            ack=lambda text=None: None,
+            request=_FakeRequest(),
+        )
+
+    debug_records = [r for r in caplog.records if r.levelname == "DEBUG"]
+    assert any("[REDACTED]" in r.message for r in debug_records)
+    assert not any("deprecated-verification-token" in r.message for r in debug_records)
+
+
+def test_command_body_logged_at_debug_with_token_redacted_for_rate_limited_command(tmp_path, caplog):
+    middleware = make_middleware(tmp_path, max_requests=0)
+
+    with caplog.at_level("DEBUG"):
+        middleware(
+            body={"user_id": "U1", "command": "/trust", "token": "deprecated-verification-token"},
+            next=lambda: None,
+            ack=lambda text=None: None,
+            request=_FakeRequest(),
+        )
+
+    debug_records = [r for r in caplog.records if r.levelname == "DEBUG"]
+    assert any("[REDACTED]" in r.message for r in debug_records)
+    assert not any("deprecated-verification-token" in r.message for r in debug_records)

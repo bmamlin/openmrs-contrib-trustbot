@@ -58,6 +58,29 @@ def test_evaluate_unregistered_trigger_type_never_matches():
     assert evaluator.evaluate(rule_set, event) == []
 
 
+def test_evaluate_logs_event_and_matched_rule_names_at_debug(caplog):
+    rule = make_rule("grant", ["slack_trust_command"])
+    rule_set = RuleSet(rules=[rule])
+    event = TriggerEvent(type="slack_trust_command", openmrs_id="jdoe", source="alice")
+
+    with caplog.at_level("DEBUG"):
+        evaluator.evaluate(rule_set, event)
+
+    messages = [r.message for r in caplog.records]
+    assert any("slack_trust_command" in m and "jdoe" in m for m in messages)
+    assert any("grant" in m for m in messages)
+
+
+def test_evaluate_logs_no_match_at_debug(caplog):
+    rule_set = RuleSet(rules=[])
+    event = TriggerEvent(type="slack_trust_command", openmrs_id="jdoe")
+
+    with caplog.at_level("DEBUG"):
+        evaluator.evaluate(rule_set, event)
+
+    assert any("no rules matched" in r.message for r in caplog.records)
+
+
 def test_execute_rule_dispatches_to_registered_executor_and_audits(tmp_path, monkeypatch):
     calls = []
 
@@ -127,6 +150,41 @@ def test_execute_rule_records_failure_and_continues_when_executor_raises(tmp_pat
 
     rows = conn.execute("SELECT status FROM audit_log").fetchall()
     assert len(rows) == 2
+
+
+def test_execute_rule_logs_action_attempt_and_result_at_debug(tmp_path, monkeypatch, caplog):
+    def fake_executor(action, event, dry_run):
+        return ActionResult(status="success", detail="ok")
+
+    monkeypatch.setitem(evaluator.ACTION_EXECUTORS, "keycloak_add_groups", fake_executor)
+
+    rule = make_rule("grant", ["slack_trust_command"])
+    event = TriggerEvent(type="slack_trust_command", openmrs_id="jdoe", source="alice")
+    conn = get_connection(str(tmp_path / "audit.db"))
+
+    with caplog.at_level("DEBUG"):
+        evaluator.execute_rule(rule, event, conn=conn)
+
+    messages = [r.message for r in caplog.records]
+    assert any("executing action" in m and "grant" in m and "keycloak_add_groups" in m for m in messages)
+    assert any("action result" in m and "success" in m for m in messages)
+
+
+def test_execute_rule_logs_failure_result_at_debug(tmp_path, monkeypatch, caplog):
+    def broken_executor(action, event, dry_run):
+        raise RuntimeError("boom")
+
+    monkeypatch.setitem(evaluator.ACTION_EXECUTORS, "keycloak_add_groups", broken_executor)
+
+    rule = make_rule("grant", ["slack_trust_command"])
+    event = TriggerEvent(type="slack_trust_command", openmrs_id="jdoe")
+    conn = get_connection(str(tmp_path / "audit.db"))
+
+    with caplog.at_level("DEBUG"):
+        evaluator.execute_rule(rule, event, conn=conn)
+
+    messages = [r.message for r in caplog.records]
+    assert any("action result" in m and "failure" in m and "boom" in m for m in messages)
 
 
 def test_execute_rule_unknown_action_type_is_recorded_as_failure(tmp_path):

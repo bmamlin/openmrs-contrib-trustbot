@@ -82,6 +82,28 @@ def test_add_user_to_groups_retries_once_on_connection_error_then_succeeds(clien
     assert added == ["jira-users"]
 
 
+def test_add_user_to_groups_retry_logs_at_debug(client, caplog):
+    call_count = {"n": 0}
+
+    def flaky_get_user_id(_openmrs_id):
+        call_count["n"] += 1
+        if call_count["n"] == 1:
+            raise KeycloakConnectionError("connection refused")
+        return "uid-1"
+
+    with (
+        patch.object(client._admin, "get_user_id", side_effect=flaky_get_user_id),
+        patch.object(client._admin, "get_user_groups", return_value=[]),
+        patch.object(client._admin, "get_group_by_path", return_value={"id": "gid"}),
+        patch.object(client._admin, "group_user_add"),
+        caplog.at_level("DEBUG"),
+    ):
+        client.add_user_to_groups("jdoe", ["jira-users"])
+
+    debug_records = [r for r in caplog.records if r.levelname == "DEBUG"]
+    assert any("retrying" in r.message for r in debug_records)
+
+
 def test_add_user_to_groups_dry_run_returns_would_be_added_without_mutating(client):
     with (
         patch.object(client._admin, "get_user_id", return_value="uid-1"),

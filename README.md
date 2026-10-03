@@ -258,6 +258,20 @@ unrecognized level name gets `400` and leaves the current level
 unchanged. Set `admin.require_auth: false` in `config.yaml` to skip the
 token check entirely (local development only — never in production).
 
+### Use DEBUG logging
+
+Switch to `DEBUG` as above, then issue any command (`/trust test1`, a
+Discourse Workflow/webhook event, or another `/admin/log-level` call)
+and watch the service's stdout. You'll see: the request's headers
+(`Authorization` and Slack's deprecated `token` field always show as
+`"[REDACTED]"`, never their real value); which event was evaluated
+against `rules.yaml` and which rules matched (or that none did); every
+action attempted and its outcome; and, for Keycloak, any connectivity
+retries. Discourse webhook request bodies are deliberately not dumped
+raw — only the already-parsed event (username, trust level/badge ID)
+is logged, to avoid ever logging a Discourse user's full profile data.
+Switch back to `INFO` (or whatever level you run normally) when done.
+
 ### Test dry-run mode
 
 Set `DRY_RUN=true` in `.env` (or `dry_run: true` in `config.yaml`) and
@@ -277,9 +291,9 @@ which should show `dry_run` rather than `success`. Set `DRY_RUN=false`
 
 The rules engine core, the Slack `/trust`/`/revoke`/`/trust-status`
 commands, the Discourse `webhook`/`workflow` triggers, the audit log,
-rate limiting, the admin log-level API, and dry-run mode are all
-implemented and tested — every item in the project spec's Functional and
-Security Requirements checklists is now built. See
+rate limiting, the admin log-level API, dry-run mode, and DEBUG-level
+logging are all implemented and tested — every item in the project
+spec's Functional and Security Requirements checklists is now built. See
 [openspec/specs/overview.md](openspec/specs/overview.md) for the full
 functional and security requirements this project is being built against,
 and [CLAUDE.md](CLAUDE.md) for a more detailed current-state summary.

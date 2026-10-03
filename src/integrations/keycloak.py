@@ -11,10 +11,13 @@ a short delay (keycloak.retry.* in config.yaml) before raising.
 
 from __future__ import annotations
 
+import logging
 import time
 
 from keycloak import KeycloakAdmin
 from keycloak.exceptions import KeycloakConnectionError
+
+logger = logging.getLogger(__name__)
 
 
 class UserNotFoundError(Exception):
@@ -61,6 +64,12 @@ class KeycloakClient:
             except KeycloakConnectionError:
                 if attempt >= attempts:
                     raise
+                logger.debug(
+                    "retrying %s after connection error (attempt %d/%d)",
+                    getattr(fn, "__name__", repr(fn)),
+                    attempt,
+                    attempts,
+                )
                 time.sleep(self._retry_delay_seconds)
 
     def _require_user_id(self, openmrs_id: str) -> str:

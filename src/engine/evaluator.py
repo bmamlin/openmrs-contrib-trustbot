@@ -13,11 +13,14 @@ that adding a new trigger or action type requires no changes here.
 
 from __future__ import annotations
 
+import logging
 import sqlite3
 from typing import Callable
 
 from src.audit.db import record_event
 from src.engine.models import Action, ActionResult, Rule, RuleSet, Trigger, TriggerEvent
+
+logger = logging.getLogger(__name__)
 
 TRIGGER_MATCHERS: dict[str, Callable[[Trigger, TriggerEvent], bool]] = {}
 ACTION_EXECUTORS: dict[str, Callable[[Action, TriggerEvent, bool], ActionResult]] = {}
@@ -52,11 +55,26 @@ def evaluate(rule_set: RuleSet, event: TriggerEvent) -> list[Rule]:
     Only `enabled` rules are considered. A rule matches if ANY of its
     triggers matches (OR logic).
     """
-    return [
+    logger.debug(
+        "evaluating event: type=%s name=%s openmrs_id=%s payload=%s",
+        event.type,
+        event.name,
+        event.openmrs_id,
+        event.payload,
+    )
+
+    matched = [
         rule
         for rule in rule_set.rules
         if rule.enabled and any(_trigger_matches(trigger, event) for trigger in rule.triggers)
     ]
+
+    if matched:
+        logger.debug("matched rules: %s", [rule.name for rule in matched])
+    else:
+        logger.debug("no rules matched")
+
+    return matched
 
 
 def execute_rule(
@@ -75,6 +93,8 @@ def execute_rule(
     """
     results = []
     for action in rule.actions:
+        logger.debug("executing action: rule=%r type=%s", rule.name, action.type)
+
         executor = ACTION_EXECUTORS.get(action.type)
         if executor is None:
             result = ActionResult(
@@ -85,6 +105,14 @@ def execute_rule(
                 result = executor(action, event, dry_run)
             except Exception as exc:  # noqa: BLE001 - deliberately broad, see docstring
                 result = ActionResult(status="failure", detail=f"Unexpected error: {exc}")
+
+        logger.debug(
+            "action result: rule=%r type=%s status=%s detail=%s",
+            rule.name,
+            action.type,
+            result.status,
+            result.detail,
+        )
 
         record_event(
             conn,

@@ -237,7 +237,7 @@ CREATE TABLE audit_log (
 - [ ] Application log level configurable via `LOG_LEVEL` environment variable (`DEBUG`, `INFO`, `WARNING`, `ERROR`)
 - [ ] Log level changeable at runtime without restarting the service via a protected admin API endpoint
 - [ ] Logs emitted to stdout/stderr in structured JSON format for compatibility with Docker logging infrastructure
-- [ ] DEBUG mode must never log secrets, credentials, or raw webhook payloads containing sensitive data
+- [ ] DEBUG mode must never log secrets, credentials, or raw webhook payloads containing sensitive data. **Implemented**: DEBUG logs every incoming POST's headers (minus `Authorization`), the rules-engine's evaluation flow (which event, which rules matched), and every action attempt and outcome — generically, for every trigger/action type. Native Discourse webhook bodies are deliberately *not* dumped raw (see `openspec/changes/archive/*-add-debug-logging/design.md`); only the already-curated `TriggerEvent` built from them is logged.
 
 #### Future: Admin UI (post-MVP)
 

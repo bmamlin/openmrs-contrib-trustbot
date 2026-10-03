@@ -35,6 +35,10 @@ def create_admin_router(*, admin_api_token: str, require_auth: bool) -> APIRoute
     @router.post("/log-level")
     async def set_log_level(request: Request, level: str) -> dict:
         """Change the running service's log level (DEBUG | INFO | WARNING | ERROR)."""
+        logger.debug(
+            "received request: headers=%s", logging_setup.redact_headers(dict(request.headers))
+        )
+
         if require_auth and not _is_authorized(request, admin_api_token):
             logger.warning("Admin log-level change rejected: missing or invalid bearer token")
             raise HTTPException(status_code=401, detail="unauthorized")
@@ -44,6 +48,7 @@ def create_admin_router(*, admin_api_token: str, require_auth: bool) -> APIRoute
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+        logger.debug("log level changed to %s", level.upper())
         return {"level": level.upper()}
 
     return router

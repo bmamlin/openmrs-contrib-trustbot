@@ -51,3 +51,11 @@ def test_load_rules_uses_rules_path_env_var(monkeypatch):
     rule_set = load_rules()
 
     assert len(rule_set.rules) == 3
+
+
+def test_load_rules_logs_path_and_count_at_debug(caplog):
+    with caplog.at_level("DEBUG"):
+        load_rules(EXAMPLE_RULES)
+
+    messages = [r.message for r in caplog.records]
+    assert any("3" in m and str(EXAMPLE_RULES) in m for m in messages)

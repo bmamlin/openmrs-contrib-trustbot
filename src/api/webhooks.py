@@ -53,6 +53,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from src.engine import evaluator
 from src.engine.loader import load_rules
+from src.logging_setup import redact_headers
 from src.ratelimit import RateLimiter
 from src.triggers import discourse_webhook, discourse_workflow
 
@@ -129,6 +130,8 @@ def create_webhooks_router(
 
     @router.post("/webhook/discourse")
     async def discourse_webhook_route(request: Request) -> dict:
+        logger.debug("received request: headers=%s", redact_headers(dict(request.headers)))
+
         source_ip = _source_ip(request)
         if not context.rate_limiter.is_allowed(source_ip):
             logger.warning("Discourse webhook rate limit exceeded for source IP %s", source_ip)

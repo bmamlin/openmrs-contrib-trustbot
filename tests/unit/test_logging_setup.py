@@ -3,7 +3,7 @@ import logging
 
 import pytest
 
-from src.logging_setup import configure_logging, set_log_level
+from src.logging_setup import configure_logging, redact_headers, redact_slack_body, set_log_level
 
 
 @pytest.fixture(autouse=True)
@@ -83,3 +83,32 @@ def test_set_log_level_rejects_unrecognized_level_and_leaves_level_unchanged():
 def test_configure_logging_rejects_unrecognized_level():
     with pytest.raises(ValueError):
         configure_logging("VERBOSE")
+
+
+def test_redact_headers_replaces_authorization_case_insensitively():
+    headers = {"Authorization": "Bearer secret-token", "X-Discourse-Event": "user_promoted"}
+
+    redacted = redact_headers(headers)
+
+    assert redacted["Authorization"] == "[REDACTED]"
+    assert redacted["X-Discourse-Event"] == "user_promoted"
+    assert headers["Authorization"] == "Bearer secret-token"  # input untouched
+
+
+def test_redact_headers_matches_any_case():
+    headers = {"authorization": "Bearer secret-token"}
+
+    redacted = redact_headers(headers)
+
+    assert redacted["authorization"] == "[REDACTED]"
+
+
+def test_redact_slack_body_replaces_token():
+    body = {"token": "deprecated-verification-token", "command": "/trust", "text": "jdoe"}
+
+    redacted = redact_slack_body(body)
+
+    assert redacted["token"] == "[REDACTED]"
+    assert redacted["command"] == "/trust"
+    assert redacted["text"] == "jdoe"
+    assert body["token"] == "deprecated-verification-token"  # input untouched

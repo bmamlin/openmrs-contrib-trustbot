@@ -94,3 +94,40 @@ def test_rejection_logs_warning_without_leaking_any_token_value(caplog):
     for record in warnings:
         assert ADMIN_API_TOKEN not in record.message
         assert "wrong-token" not in record.message
+
+
+def test_headers_logged_at_debug_with_authorization_redacted(caplog):
+    client = make_client(require_auth=True)
+
+    with caplog.at_level("DEBUG"):
+        response = post_log_level(client, "DEBUG", token=ADMIN_API_TOKEN)
+
+    assert response.status_code == 200
+    debug_records = [r for r in caplog.records if r.levelname == "DEBUG"]
+    assert any("authorization" in r.message for r in debug_records)
+    for record in debug_records:
+        assert ADMIN_API_TOKEN not in record.message
+
+
+def test_headers_logged_at_debug_for_rejected_request_with_wrong_token_redacted(caplog):
+    client = make_client(require_auth=True)
+
+    with caplog.at_level("DEBUG"):
+        response = post_log_level(client, "DEBUG", token="wrong-token")
+
+    assert response.status_code == 401
+    debug_records = [r for r in caplog.records if r.levelname == "DEBUG"]
+    assert any("authorization" in r.message for r in debug_records)
+    for record in debug_records:
+        assert "wrong-token" not in record.message
+
+
+def test_successful_level_change_logs_new_level_at_debug(caplog):
+    client = make_client(require_auth=True)
+
+    with caplog.at_level("DEBUG"):
+        response = post_log_level(client, "DEBUG", token=ADMIN_API_TOKEN)
+
+    assert response.status_code == 200
+    debug_records = [r for r in caplog.records if r.levelname == "DEBUG"]
+    assert any("DEBUG" in r.message and "changed" in r.message for r in debug_records)

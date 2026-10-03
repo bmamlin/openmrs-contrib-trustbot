@@ -11,8 +11,17 @@ from __future__ import annotations
 import json
 import logging
 import os
+from typing import Any, Mapping
 
 VALID_LOG_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR"}
+
+# Header/body field names that must never appear in a DEBUG log, even
+# though DEBUG is otherwise meant to dump request headers/bodies freely.
+# Header names are matched case-insensitively (HTTP header names are
+# case-insensitive); Slack body keys are matched exactly (they're
+# programmatic field names, not HTTP headers).
+REDACTED_HEADER_NAMES = {"authorization"}
+REDACTED_SLACK_BODY_FIELDS = {"token"}
 
 
 class JsonFormatter(logging.Formatter):
@@ -26,6 +35,28 @@ class JsonFormatter(logging.Formatter):
             "message": record.getMessage(),
         }
         return json.dumps(payload)
+
+
+def redact_headers(headers: Mapping[str, str]) -> dict[str, str]:
+    """Return a copy of `headers` with any REDACTED_HEADER_NAMES value replaced.
+
+    Does not mutate `headers`. Matches header names case-insensitively.
+    """
+    return {
+        key: ("[REDACTED]" if key.lower() in REDACTED_HEADER_NAMES else value)
+        for key, value in headers.items()
+    }
+
+
+def redact_slack_body(body: Mapping[str, Any]) -> dict[str, Any]:
+    """Return a copy of `body` with any REDACTED_SLACK_BODY_FIELDS value replaced.
+
+    Does not mutate `body`.
+    """
+    return {
+        key: ("[REDACTED]" if key in REDACTED_SLACK_BODY_FIELDS else value)
+        for key, value in body.items()
+    }
 
 
 def set_log_level(level: str) -> None:

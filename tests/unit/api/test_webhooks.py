@@ -337,3 +337,68 @@ def test_rate_limit_rejection_logs_warning_with_source_ip(caplog):
             record.levelname == "WARNING" and "203.0.113.77" in record.message
             for record in caplog.records
         )
+
+
+# --- DEBUG request logging ---
+
+
+def test_headers_logged_at_debug_for_accepted_request(client, tmp_path, monkeypatch, caplog):
+    empty_rules_path = tmp_path / "rules.yaml"
+    empty_rules_path.write_text("rules: []\n")
+    monkeypatch.setenv("RULES_PATH", str(empty_rules_path))
+
+    test_client, conn = client
+    body = json.dumps(workflow_payload()).encode()
+
+    with caplog.at_level("DEBUG"):
+        response = post_workflow(test_client, body, signature=sign(body, WORKFLOW_SECRET))
+
+    assert response.status_code == 200
+    debug_records = [r for r in caplog.records if r.levelname == "DEBUG"]
+    assert any("x-discourse-workflow" in r.message for r in debug_records)
+
+
+def test_headers_logged_at_debug_for_signature_rejected_request(client, caplog):
+    test_client, conn = client
+    body = json.dumps(workflow_payload()).encode()
+
+    with caplog.at_level("DEBUG"):
+        response = post_workflow(test_client, body, signature="sha256=" + "0" * 64)
+
+    assert response.status_code == 403
+    debug_records = [r for r in caplog.records if r.levelname == "DEBUG"]
+    assert any("x-discourse-workflow" in r.message for r in debug_records)
+
+
+def test_headers_logged_at_debug_for_rate_limited_request(caplog):
+    limiter_client, limiter_conn = make_client(rate_limiter=RateLimiter(max_requests=0, window_seconds=60))
+    with limiter_client:
+        body = json.dumps(workflow_payload()).encode()
+        with caplog.at_level("DEBUG"):
+            response = limiter_client.post(
+                "/webhook/discourse",
+                content=body,
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Discourse-Workflow-Secret": sign(body, WORKFLOW_SECRET),
+                    "X-Discourse-Workflow": "trusted",
+                },
+            )
+
+        assert response.status_code == 429
+        debug_records = [r for r in caplog.records if r.levelname == "DEBUG"]
+        assert any("x-discourse-workflow" in r.message for r in debug_records)
+
+
+def test_raw_body_never_appears_in_debug_logs(client, caplog):
+    # Invalid signature -- rejected before the rules engine, so this
+    # needs no RULES_PATH; the point is the raw body is never logged
+    # regardless of how the request is handled.
+    test_client, conn = client
+    body = json.dumps({"username": "jdoe", "some_other_secret_looking_field": "zzz"}).encode()
+
+    with caplog.at_level("DEBUG"):
+        post_workflow(test_client, body, signature="sha256=" + "0" * 64)
+
+    debug_records = [r for r in caplog.records if r.levelname == "DEBUG"]
+    assert not any("some_other_secret_looking_field" in r.message for r in debug_records)

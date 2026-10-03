@@ -143,5 +143,16 @@ a restart, reusing the same `src/logging_setup.py` logger. Dry-run mode
 trigger path — the Discourse webhook and all three Slack commands —
 evaluate and audit-log rule actions as usual (status `dry_run`) without
 making any actual Keycloak change; `/trust`/`/revoke` responses disclose
-this explicitly when active. Every item in the spec's Functional and
-Security Requirements checklists (§5–§6) is now implemented.
+this explicitly when active. DEBUG level (toggled via the admin endpoint
+or `LOG_LEVEL`) now actually does something: every incoming POST's
+headers (minus `Authorization`, via `src/logging_setup.py: redact_headers()`),
+the rules engine's evaluation flow (`src/engine/evaluator.py`: which
+event, which rules matched, every action attempted and its outcome —
+generically, for every trigger/action type, logged once at these two
+chokepoints rather than scattered across `src/triggers/`/`src/actions/`),
+`rules.yaml` reloads, and Keycloak connectivity retries are all traced.
+Native Discourse webhook bodies are deliberately not dumped raw (only
+the already-curated `TriggerEvent` is); Slack's deprecated `token`
+field is redacted the same way headers are. Every item in the spec's
+Functional and Security Requirements checklists (§5–§6) is now
+implemented.

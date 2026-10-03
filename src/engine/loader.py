@@ -8,12 +8,15 @@ at startup elsewhere (not in this module).
 
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 
 import yaml
 
 from src.engine.models import RuleSet
+
+logger = logging.getLogger(__name__)
 
 
 def default_rules_path() -> Path:
@@ -30,4 +33,6 @@ def load_rules(path: Path | str | None = None) -> RuleSet:
     resolved = Path(path) if path is not None else default_rules_path()
     with open(resolved) as f:
         raw = yaml.safe_load(f)
-    return RuleSet.model_validate(raw)
+    rule_set = RuleSet.model_validate(raw)
+    logger.debug("loaded %d rule(s) from %s", len(rule_set.rules), resolved)
+    return rule_set

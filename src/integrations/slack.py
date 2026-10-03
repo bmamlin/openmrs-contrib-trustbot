@@ -30,6 +30,7 @@ from src.engine.models import ActionResult
 from src.integrations import discourse as discourse_integration
 from src.integrations import keycloak as keycloak_integration
 from src.integrations.keycloak import UserNotFoundError
+from src.logging_setup import redact_headers, redact_slack_body
 from src.ratelimit import RateLimiter
 from src.triggers.slack import build_revoke_event, build_trust_event
 
@@ -69,7 +70,13 @@ def create_slack_app(
     )
 
     @app.use
-    def rate_limit_middleware(body, next, ack):
+    def rate_limit_middleware(body, next, ack, request):
+        logger.debug(
+            "received command: headers=%s body=%s",
+            redact_headers(dict(request.headers)),
+            redact_slack_body(body),
+        )
+
         user_id = body.get("user_id")
         if not rate_limiter.is_allowed(user_id):
             logger.warning("Slack command rate limit exceeded for user %s", user_id)
