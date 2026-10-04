@@ -1,6 +1,6 @@
-fastapi
-uvicorn
-slack-bolt
-python-keycloak
-pydiscourse
-pyyaml
+fastapi==0.141.1
+uvicorn==0.53.0
+slack-bolt==1.30.0
+python-keycloak==7.1.1
+pydiscourse==1.7.0
+pyyaml==6.0.3

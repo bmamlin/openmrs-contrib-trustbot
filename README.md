@@ -297,3 +297,7 @@ spec's Functional and Security Requirements checklists is now built. See
 [openspec/specs/overview.md](openspec/specs/overview.md) for the full
 functional and security requirements this project is being built against,
 and [CLAUDE.md](CLAUDE.md) for a more detailed current-state summary.
+
+## License
+
+[Mozilla Public License 2.0](LICENSE)

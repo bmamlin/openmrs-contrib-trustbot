@@ -49,13 +49,16 @@ def test_load_rules_uses_rules_path_env_var(monkeypatch):
     monkeypatch.setenv("RULES_PATH", str(EXAMPLE_RULES))
 
     rule_set = load_rules()
+    direct = load_rules(EXAMPLE_RULES)
 
-    assert len(rule_set.rules) == 3
+    assert [r.name for r in rule_set.rules] == [r.name for r in direct.rules]
 
 
 def test_load_rules_logs_path_and_count_at_debug(caplog):
     with caplog.at_level("DEBUG"):
-        load_rules(EXAMPLE_RULES)
+        rule_set = load_rules(EXAMPLE_RULES)
 
     messages = [r.message for r in caplog.records]
-    assert any("3" in m and str(EXAMPLE_RULES) in m for m in messages)
+    assert any(
+        str(len(rule_set.rules)) in m and str(EXAMPLE_RULES) in m for m in messages
+    )
