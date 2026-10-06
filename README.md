@@ -191,7 +191,11 @@ for the full rationale behind this two-mechanism model.
   * CONFIG_PATH=./config/config.yaml
   * RULES_PATH=./config/rules.yaml
 2. Copy `config/config.example.yaml` to `config/config.yaml` and set:
-  * `keycloak.base_url`: "http://localhost:8090"
+  * `keycloak.base_url`: "http://localhost:8090" for a local `uvicorn` run;
+    "http://host.docker.internal:8090" if running the service itself via
+    `docker compose up` instead (a container can't reach a host port
+    through `localhost`, but Docker provides `host.docker.internal` for
+    exactly this)
   * `keycloak.realm`: "master"
   * `slack.trusted_channel_id`: "{Slack Channel ID}"
   * `database.path`: "./data/audit.db"
