@@ -46,7 +46,10 @@ admin_router = admin.create_admin_router(
 )
 app.include_router(admin_router)
 
-audit_conn = get_connection(config.database.path)
+_database_path_override = os.environ.get("DATABASE_PATH", "").strip()
+database_path = _database_path_override or config.database.path
+
+audit_conn = get_connection(database_path)
 app.state.audit_conn = audit_conn
 
 _dry_run_override = os.environ.get("DRY_RUN", "").strip().lower()

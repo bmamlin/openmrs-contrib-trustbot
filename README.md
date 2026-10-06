@@ -70,6 +70,13 @@ In production these are host-mounted from `/opt/trustbot/config` and
 `/opt/trustbot/data` respectively (see the spec's Host-Mounted Volumes
 section) via the deployment's Terraform + Docker Compose configuration.
 
+`docker-compose.yml` always sets `CONFIG_PATH`, `RULES_PATH`, and
+`DATABASE_PATH` to the container's absolute mount paths itself,
+overriding whatever `.env` sets for local development — so the same
+`.env` and `config/config.yaml` (with their relative, local paths) work
+for both `uvicorn` and `docker compose up` without editing anything when
+switching between them.
+
 ## Manual testing
 
 ### Set up a development Keycloak instance locally

@@ -241,6 +241,9 @@ These are never stored in YAML files.
 | `ADMIN_API_TOKEN` | Yes | Bearer token for the admin API endpoints |
 | `LOG_LEVEL` | No | Overrides `logging.level` in `config.yaml` if set |
 | `DRY_RUN` | No | Overrides `dry_run` in `config.yaml` if set (`true`/`false`, case-insensitive) |
+| `CONFIG_PATH` | No | Path to `config.yaml`. Defaults to `/config/config.yaml` (the container mount path); `docker-compose.yml` always sets this explicitly to that same path, overriding `.env`, so this is only meaningful for local, non-Docker development |
+| `RULES_PATH` | No | Path to `rules.yaml`. Defaults to `/config/rules.yaml` (the container mount path); `docker-compose.yml` always sets this explicitly to that same path, overriding `.env`, so this is only meaningful for local, non-Docker development |
+| `DATABASE_PATH` | No | Overrides `database.path` in `config.yaml` if set. `docker-compose.yml` always sets this explicitly to the container mount path (`/data/audit.db`), overriding `.env`, so this is only meaningful for local, non-Docker development |
 
 ---
 

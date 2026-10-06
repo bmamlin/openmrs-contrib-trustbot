@@ -90,6 +90,8 @@ logging:
 database:
   # Path inside the container to the SQLite audit database.
   # Should be within the host-mounted /data/ volume.
+  # Can also be set or overridden via the DATABASE_PATH environment
+  # variable (docker-compose.yml always does this, to the same path).
   path: "/data/audit.db"
 
 # -----------------------------------------------------------------------------

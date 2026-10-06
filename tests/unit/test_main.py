@@ -116,6 +116,56 @@ def test_dry_run_env_var_overrides_config_value(tmp_path, monkeypatch):
         sys.modules.pop("src.main", None)
 
 
+def test_blank_database_path_env_var_falls_back_to_config_value(tmp_path, monkeypatch):
+    db_path = tmp_path / "audit.db"
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(CONFIG_YAML.format(db_path=db_path))
+
+    monkeypatch.setenv("CONFIG_PATH", str(config_path))
+    monkeypatch.setenv("KEYCLOAK_CLIENT_ID", "dummy-client-id")
+    monkeypatch.setenv("KEYCLOAK_CLIENT_SECRET", "dummy-client-secret")
+    monkeypatch.setenv("SLACK_BOT_TOKEN", "xoxb-dummy-token")
+    monkeypatch.setenv("SLACK_SIGNING_SECRET", "dummy-signing-secret")
+    monkeypatch.setenv("DISCOURSE_API_KEY", "dummy-discourse-api-key")
+    monkeypatch.setenv("DISCOURSE_API_USERNAME", "dummy-discourse-api-username")
+    monkeypatch.setenv("DISCOURSE_WORKFLOW_SECRET", "dummy-workflow-secret")
+    monkeypatch.setenv("DISCOURSE_WEBHOOK_SECRET", "dummy-webhook-secret")
+    monkeypatch.setenv("ADMIN_API_TOKEN", "dummy-admin-token")
+    monkeypatch.setenv("DATABASE_PATH", "")
+
+    sys.modules.pop("src.main", None)
+    try:
+        main = importlib.import_module("src.main")
+        assert main.database_path == str(db_path)
+    finally:
+        sys.modules.pop("src.main", None)
+
+
+def test_database_path_env_var_overrides_config_value(tmp_path, monkeypatch):
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(CONFIG_YAML.format(db_path=tmp_path / "config-audit.db"))
+    override_path = tmp_path / "override-audit.db"
+
+    monkeypatch.setenv("CONFIG_PATH", str(config_path))
+    monkeypatch.setenv("KEYCLOAK_CLIENT_ID", "dummy-client-id")
+    monkeypatch.setenv("KEYCLOAK_CLIENT_SECRET", "dummy-client-secret")
+    monkeypatch.setenv("SLACK_BOT_TOKEN", "xoxb-dummy-token")
+    monkeypatch.setenv("SLACK_SIGNING_SECRET", "dummy-signing-secret")
+    monkeypatch.setenv("DISCOURSE_API_KEY", "dummy-discourse-api-key")
+    monkeypatch.setenv("DISCOURSE_API_USERNAME", "dummy-discourse-api-username")
+    monkeypatch.setenv("DISCOURSE_WORKFLOW_SECRET", "dummy-workflow-secret")
+    monkeypatch.setenv("DISCOURSE_WEBHOOK_SECRET", "dummy-webhook-secret")
+    monkeypatch.setenv("ADMIN_API_TOKEN", "dummy-admin-token")
+    monkeypatch.setenv("DATABASE_PATH", str(override_path))
+
+    sys.modules.pop("src.main", None)
+    try:
+        main = importlib.import_module("src.main")
+        assert main.database_path == str(override_path)
+    finally:
+        sys.modules.pop("src.main", None)
+
+
 def test_app_fails_to_start_when_admin_auth_required_but_token_is_blank(tmp_path, monkeypatch):
     # admin.require_auth defaults to true (not set in CONFIG_YAML), so a
     # blank ADMIN_API_TOKEN must fail fast at startup -- an admin endpoint
