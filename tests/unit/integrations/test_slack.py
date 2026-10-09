@@ -31,7 +31,7 @@ def test_create_slack_app_registers_revoke_command(tmp_path):
     app = make_app(tmp_path)
 
     matches_revoke_command = any(
-        matcher.func({"command": "/revoke"})
+        matcher.func({"command": "/trust-revoke"})
         for listener in app._listeners
         for matcher in listener.matchers
     )

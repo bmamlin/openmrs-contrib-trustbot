@@ -1,12 +1,13 @@
 """Slack client/app setup (built on slack-bolt).
 
-Registers the `/trust`, `/revoke`, and `/trust-status` slash commands and
-relies on slack-bolt's own signature verification (SLACK_SIGNING_SECRET,
-checked by the App/SlackRequestHandler before any listener runs — see the
-add-slack-trust-grant design.md) and posting responses back to Slack
-(SLACK_BOT_TOKEN). `/trust` and `/revoke`'s channel-restriction enforcement
-and TriggerEvent construction live in src/triggers/slack.py; rule loading
-and dispatch live in src/engine/loader.py and src/engine/evaluator.py.
+Registers the `/trust`, `/trust-revoke`, and `/trust-status` slash
+commands and relies on slack-bolt's own signature verification
+(SLACK_SIGNING_SECRET, checked by the App/SlackRequestHandler before any
+listener runs — see the add-slack-trust-grant design.md) and posting
+responses back to Slack (SLACK_BOT_TOKEN). `/trust` and
+`/trust-revoke`'s channel-restriction enforcement and TriggerEvent
+construction live in src/triggers/slack.py; rule loading and dispatch
+live in src/engine/loader.py and src/engine/evaluator.py.
 `/trust-status` is read-only and never reaches the rules engine — see its
 own handler below and the add-slack-trust-status-command design.md for why
 its channel check is inline here rather than routed through
@@ -92,7 +93,7 @@ def create_slack_app(
         ack()
         _handle_trust(command, context, respond)
 
-    @app.command("/revoke")
+    @app.command("/trust-revoke")
     def handle_revoke_command(ack, command, respond) -> None:
         ack()  # same silent-rejection rationale as /trust, see above
         _handle_revoke(command, context, respond)
@@ -153,21 +154,21 @@ def _handle_revoke(command: dict, context: SlackContext, respond) -> None:
     event = build_revoke_event(command, trusted_channel_id=context.trusted_channel_id)
     if event is None:
         logger.warning(
-            "/revoke rejected: wrong channel (user %s, channel %s)",
+            "/trust-revoke rejected: wrong channel (user %s, channel %s)",
             command.get("user_id"),
             command.get("channel_id"),
         )
         return  # wrong channel: silent rejection, no response (see build_revoke_event)
 
     if not event.openmrs_id:
-        respond("Usage: `/revoke <openmrs-id>`")
+        respond("Usage: `/trust-revoke <openmrs-id>`")
         return
 
     rule_set = load_rules()
     matched_rules = evaluator.evaluate(rule_set, event)
 
     if not matched_rules:
-        respond(f"No rule is configured to handle `/revoke` for `{event.openmrs_id}`.")
+        respond(f"No rule is configured to handle `/trust-revoke` for `{event.openmrs_id}`.")
         return
 
     outcomes: list[ActionResult] = []
@@ -194,7 +195,7 @@ def _format_revoke_response(openmrs_id: str, outcomes: Sequence[ActionResult]) -
 
 
 def _handle_trust_status(command: dict, context: SlackContext, respond) -> None:
-    # No TriggerEvent here (unlike /trust and /revoke): this command never
+    # No TriggerEvent here (unlike /trust and /trust-revoke): this command never
     # reaches the rules engine, so the channel check is done inline rather
     # than through src/triggers/slack.py's build_*_event() — see design.md.
     if command.get("channel_id") != context.trusted_channel_id:

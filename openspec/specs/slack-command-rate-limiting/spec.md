@@ -2,17 +2,17 @@
 
 ## Purpose
 
-Protects `/trust`, `/revoke`, and `/trust-status` from being spammed by a
-single Slack user issuing commands in rapid succession, by rejecting
-excess commands per issuing user — sharing one limit across all three
-commands — with a visible Slack response and a logged violation.
+Protects `/trust`, `/trust-revoke`, and `/trust-status` from being
+spammed by a single Slack user issuing commands in rapid succession, by
+rejecting excess commands per issuing user — sharing one limit across all
+three commands — with a visible Slack response and a logged violation.
 
 ## Requirements
 
 ### Requirement: Commands are rate limited per issuing Slack user
-The system SHALL track incoming `/trust`, `/revoke`, and `/trust-status`
-commands per issuing Slack user ID, sharing a single counter across all
-three commands, and enforce the configured limit
+The system SHALL track incoming `/trust`, `/trust-revoke`, and
+`/trust-status` commands per issuing Slack user ID, sharing a single
+counter across all three commands, and enforce the configured limit
 (`rate_limiting.slack_commands.max_requests` per
 `rate_limiting.slack_commands.window_seconds`).
 
@@ -23,7 +23,7 @@ three commands, and enforce the configured limit
   processing
 
 #### Scenario: Limit is shared across commands
-- **WHEN** a Slack user issues a mix of `/trust`, `/revoke`, and
+- **WHEN** a Slack user issues a mix of `/trust`, `/trust-revoke`, and
   `/trust-status` commands
 - **THEN** all of them count against the same shared limit, not three
   independent limits

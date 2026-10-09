@@ -1,13 +1,6 @@
-# slack-revoke-command Specification
+# Spec Delta
 
-## Purpose
-
-Lets a trusted community member manually revoke another user's OpenMRS
-community access via the `/trust-revoke <openmrs-id>` Slack command,
-restricted to the same designated private channel of vetted members used
-by `/trust`.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Slack request signature is verified before any processing
 The system SHALL verify the Slack request signature (using the configured
@@ -80,7 +73,7 @@ system SHALL capture the issuing Slack username, the target OpenMRS ID,
 the timestamp, and the outcome, as part of the audit trail for that rule
 evaluation.
 
-#### Scenario: Any authorized /trust-revoke command
+#### Scenario: Any authorized /revoke command
 - **WHEN** a `/trust-revoke` command passes signature verification and
   channel restriction
 - **THEN** the resulting audit record's trigger source identifies the

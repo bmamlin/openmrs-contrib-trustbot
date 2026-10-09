@@ -10,7 +10,7 @@ community access (JIRA, Confluence via Keycloak groups) based on:
 - **Discourse webhooks/Workflows** — automatic, named triggers declared
   in `rules.yaml` (e.g. a `"trusted"` Discourse Workflow, or a native
   `user_promoted` webhook event)
-- **Slack slash commands** (`/trust`, `/revoke`, `/trust-status`) — manual,
+- **Slack slash commands** (`/trust`, `/trust-revoke`, `/trust-status`) — manual,
   human-in-the-loop, restricted to a designated private Slack channel
 
 It is built around a generic, declarative **rules engine**: rules in
@@ -93,11 +93,11 @@ pytest
 
 ## Current state
 
-The rules engine core, the Slack `/trust`, `/revoke`, and `/trust-status`
+The rules engine core, the Slack `/trust`, `/trust-revoke`, and `/trust-status`
 commands, the `keycloak_add_groups` / `keycloak_remove_groups` actions, the
 Discourse webhook/workflow triggers, and the audit log are implemented
 and tested (see `openspec/changes/archive/`) — `/trust <openmrs-id>` and
-`/revoke <openmrs-id>` in the configured Slack channel grant/revoke
+`/trust-revoke <openmrs-id>` in the configured Slack channel grant/revoke
 Keycloak group access end-to-end, `/trust-status <openmrs-id>` reports
 current Keycloak groups, Discourse trust level, and recent audit history
 (read-only — it never reaches the rules engine, and degrades gracefully
@@ -131,7 +131,7 @@ Matching on anything beyond a trigger's `type`+`name` (e.g. payload
 content, a future `condition` expression) is explicitly deferred. The
 Discourse webhook and all three Slack commands are rate-limited
 (in-memory, per-source-IP for the webhook, shared per-Slack-user-ID
-across `/trust`/`/revoke`/`/trust-status`) via
+across `/trust`/`/trust-revoke`/`/trust-status`) via
 `src/ratelimit.py: RateLimiter`, with violations and the existing
 channel-restriction rejections logged at WARNING level through a minimal
 JSON logging setup (`src/logging_setup.py`, `LOG_LEVEL` env var). The
@@ -142,7 +142,7 @@ a restart, reusing the same `src/logging_setup.py` logger. Dry-run mode
 (`config.yaml`'s `dry_run`, overridable via `DRY_RUN`) makes every
 trigger path — the Discourse webhook and all three Slack commands —
 evaluate and audit-log rule actions as usual (status `dry_run`) without
-making any actual Keycloak change; `/trust`/`/revoke` responses disclose
+making any actual Keycloak change; `/trust`/`/trust-revoke` responses disclose
 this explicitly when active. DEBUG level (toggled via the admin endpoint
 or `LOG_LEVEL`) now actually does something: every incoming POST's
 headers (minus `Authorization`, via `src/logging_setup.py: redact_headers()`),

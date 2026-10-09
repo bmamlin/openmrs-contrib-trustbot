@@ -206,9 +206,9 @@ rules:
           - confluence-users
 
   # ---------------------------------------------------------------------------
-  # Manually revoke community edit access via Slack /revoke command.
+  # Manually revoke community edit access via Slack /trust-revoke command.
   # ---------------------------------------------------------------------------
-  - name: "Revoke community edit access (manual /revoke)"
+  - name: "Revoke community edit access (manual /trust-revoke)"
     enabled: true
     triggers:
       - type: slack_revoke_command

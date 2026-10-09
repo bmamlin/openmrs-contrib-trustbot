@@ -45,7 +45,7 @@ The **OpenMRS Trust Bot** is deployed as a **Docker container** within the exist
 ### 3.2 Trust Signal Sources
 
 - **Discourse Trust Levels** — Discourse natively calculates trust levels (0–4) based on reading, posting, and engagement activity. The service monitors for users reaching a configurable threshold level via webhooks.
-- **Slack commands** — A trusted community member can issue `/trust <openmrs-id>` or `/revoke <openmrs-id>` from the designated private Slack channel.
+- **Slack commands** — A trusted community member can issue `/trust <openmrs-id>` or `/trust-revoke <openmrs-id>` from the designated private Slack channel.
 
 ### 3.3 Host-Mounted Volumes
 
@@ -103,7 +103,7 @@ YAML files are loaded from the mounted `/config/` directory. See the [YAML Confi
 | `workflow` | A named Discourse Workflow's HTTP action fires (matched by `name`, e.g. `"trusted"`) | **In scope (MVP)** |
 | `webhook` | A named native Discourse webhook event fires (matched by `name`, e.g. `"user_promoted"`) | **In scope (MVP)** |
 | `slack_trust_command` | Trusted member issues `/trust <openmrs-id>` in designated Slack channel | **In scope (MVP)** |
-| `slack_revoke_command` | Trusted member issues `/revoke <openmrs-id>` in designated Slack channel | **In scope (MVP)** |
+| `slack_revoke_command` | Trusted member issues `/trust-revoke <openmrs-id>` in designated Slack channel | **In scope (MVP)** |
 | `github_contribution` | User meets a contribution threshold in a GitHub org/repo | Future |
 | `jira_contribution` | User meets a threshold of JIRA activity | Future |
 | `confluence_contribution` | User meets a threshold of Confluence edits | Future |
@@ -181,7 +181,7 @@ If a rule fires but produces no change (e.g. `/trust` is issued for a user who a
 
 - [ ] Register the following slash commands in the OpenMRS Slack workspace, all restricted to the designated private channel:
   - `/trust <openmrs-id>` — grant community edit access
-  - `/revoke <openmrs-id>` — revoke community edit access
+  - `/trust-revoke <openmrs-id>` — revoke community edit access
   - `/trust-status <openmrs-id>` — display current trust state (see §5.3.1)
 - [ ] Validate the source channel ID matches the configured designated private channel; reject commands from any other channel with no action taken
 - [ ] Trigger rule evaluation as a `slack_trust_command` or `slack_revoke_command` event for the target OpenMRS ID
@@ -253,7 +253,7 @@ Security is a primary concern given the service directly controls privilege esca
 
 ### 6.1 Authorization
 
-- [ ] Slack `/trust` and `/revoke` commands must verify the source channel ID matches the designated private channel before taking any action; commands from any other channel are rejected silently (no action, no response)
+- [ ] Slack `/trust` and `/trust-revoke` commands must verify the source channel ID matches the designated private channel before taking any action; commands from any other channel are rejected silently (no action, no response)
 - [ ] The Keycloak service account must be **least-privilege**: scoped only to add/remove users from the specific groups managed by this service
 - [ ] Slack command endpoints must verify the Slack request signature (using the Slack signing secret) to prevent spoofed requests
 
@@ -310,9 +310,9 @@ Security is a primary concern given the service directly controls privilege esca
 2. ~~**User identity linking**~~ **Resolved:** Users authenticate to Discourse via Keycloak SSO, so the Discourse username is always identical to the OpenMRS ID / Keycloak username. Keycloak is the authoritative source for email addresses.
 3. ~~**Who is "trusted" in Slack?**~~ **Resolved:** Authorized users are members of the Discourse `/dev/5` group. MVP uses a restricted private Slack channel whose membership is limited to `/dev/5` members (managed by ITSM). The service validates the source channel ID against a configured value. A Slack username → OpenMRS ID mapping may be added in future to enable explicit self-elevation checks.
 4. ~~**`/trust` command behavior**~~ **Resolved:** `/trust <openmrs-id>` grants basic "member of the community" access via a `slack_trust_command` rule — same Keycloak groups as the Discourse TL2 rule.
-5. ~~**Additional Slack commands**~~ **Resolved:** `/trust <openmrs-id>`, `/revoke <openmrs-id>`, and `/trust-status <openmrs-id>` — all restricted to the designated private channel.
+5. ~~**Additional Slack commands**~~ **Resolved:** `/trust <openmrs-id>`, `/trust-revoke <openmrs-id>`, and `/trust-status <openmrs-id>` — all restricted to the designated private channel.
 6. ~~**Notification behavior**~~ **Resolved:** No user notifications in MVP. `slack_notify`, `email`, and `discourse_notify` are deferred as future action types.
-7. ~~**Rollback / revocation**~~ **Resolved:** Manual revocation via `/revoke`, triggering `keycloak_remove_groups`. Automatic revocation and writing back to Discourse trust levels are out of scope.
+7. ~~**Rollback / revocation**~~ **Resolved:** Manual revocation via `/trust-revoke`, triggering `keycloak_remove_groups`. Automatic revocation and writing back to Discourse trust levels are out of scope.
 8. ~~**Preferred language/stack**~~ **Resolved:** Python 3.12+ with FastAPI, slack-bolt, python-keycloak, pydiscourse, PyYAML/strictyaml, pytest.
 9. ~~**Audit log destination**~~ **Resolved:** SQLite at `/data/audit.db` on a host-mounted Docker volume. See schema in §5.5.
 10. ~~**Discourse polling vs. webhooks**~~ **Resolved:** Discourse webhooks and Discourse Workflow HTTP actions, both with signature verification. Replay protection was considered and deliberately not implemented — every action is idempotent, so it's unnecessary.

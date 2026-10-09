@@ -1,4 +1,4 @@
-"""End-to-end /revoke flow: Slack command -> rules engine -> Keycloak -> audit log.
+"""End-to-end /trust-revoke flow: Slack command -> rules engine -> Keycloak -> audit log.
 
 Mirrors test_slack_trust_flow.py. Exercises
 src.integrations.slack._handle_revoke() directly (bypassing slack-bolt's

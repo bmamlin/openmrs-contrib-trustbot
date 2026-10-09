@@ -1,4 +1,4 @@
-"""Security-focused tests for the /revoke command's authorization checks.
+"""Security-focused tests for the /trust-revoke command's authorization checks.
 
 Mirrors test_slack_trust_command.py. Per the slack-revoke-command spec:
 signature verification happens before anything else, and a command from
@@ -85,7 +85,7 @@ def slack_command_body(*, channel_id: str, text: str = "jdoe", user_name: str = 
             "channel_id": channel_id,
             "user_id": "U0123456789",
             "user_name": user_name,
-            "command": "/revoke",
+            "command": "/trust-revoke",
             "text": text,
             "response_url": "https://hooks.slack.com/commands/T0123456789/000/xxx",
             "trigger_id": "000.000.abc",

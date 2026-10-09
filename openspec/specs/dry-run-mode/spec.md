@@ -3,9 +3,10 @@
 ## Purpose
 
 Lets an operator run the rules engine against real trigger events —
-Discourse trust-level changes, Slack `/trust` and `/revoke` commands —
-without making any actual change to Keycloak, so `rules.yaml` changes and
-new wiring can be verified safely before being trusted in production.
+Discourse trust-level changes, Slack `/trust` and `/trust-revoke`
+commands — without making any actual change to Keycloak, so `rules.yaml`
+changes and new wiring can be verified safely before being trusted in
+production.
 
 ## Requirements
 
@@ -71,7 +72,7 @@ treated as `false`.
   `dry_run` setting
 
 ### Requirement: Slack commands disclose dry-run in their response
-A `/trust` or `/revoke` command that passes authorization and is
+A `/trust` or `/trust-revoke` command that passes authorization and is
 evaluated while dry-run mode is active SHALL receive a response that
 clearly states no real change was made, rather than the normal
 success/no-change wording.
@@ -82,8 +83,8 @@ success/no-change wording.
 - **THEN** the Slack response states that the grant was simulated and no
   real change was made
 
-#### Scenario: /revoke evaluated during dry-run
-- **WHEN** a `/revoke <openmrs-id>` command passes authorization checks
-  while dry-run mode is active
+#### Scenario: /trust-revoke evaluated during dry-run
+- **WHEN** a `/trust-revoke <openmrs-id>` command passes authorization
+  checks while dry-run mode is active
 - **THEN** the Slack response states that the revocation was simulated
   and no real change was made

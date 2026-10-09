@@ -1,6 +1,6 @@
 """End-to-end /trust-status flow: Slack command -> read/aggregate -> respond.
 
-Unlike /trust and /revoke, this never reaches the rules engine (per spec).
+Unlike /trust and /trust-revoke, this never reaches the rules engine (per spec).
 Exercises src.integrations.slack._handle_trust_status() directly (bypassing
 slack-bolt's HTTP/signature layer, out of scope here) with mocked Keycloak
 and Discourse clients and a real temp audit DB seeded via record_event().

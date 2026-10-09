@@ -11,7 +11,7 @@ def test_load_rules_parses_example_file():
     names = [rule.name for rule in rule_set.rules]
     assert "Grant community edit access (Discourse TL2)" in names
     assert "Grant community edit access (manual /trust)" in names
-    assert "Revoke community edit access (manual /revoke)" in names
+    assert "Revoke community edit access (manual /trust-revoke)" in names
 
 
 def test_load_rules_rereads_file_on_every_call(tmp_path):

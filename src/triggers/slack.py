@@ -1,7 +1,7 @@
 """The `slack_trust_command` and `slack_revoke_command` triggers.
 
-Match Slack `/trust <openmrs-id>` and `/revoke <openmrs-id>` slash command
-events issued from the configured designated private channel
+Match Slack `/trust <openmrs-id>` and `/trust-revoke <openmrs-id>` slash
+command events issued from the configured designated private channel
 (`slack.trusted_channel_id` in config.yaml). Commands from any other
 channel must never match (see openspec/specs/overview.md §6.1) — that
 check belongs here, not further downstream.
@@ -53,7 +53,7 @@ def build_trust_event(command: dict, *, trusted_channel_id: str) -> TriggerEvent
 
 
 def build_revoke_event(command: dict, *, trusted_channel_id: str) -> TriggerEvent | None:
-    """Build a slack_revoke_command TriggerEvent from a Slack `/revoke` command payload.
+    """Build a slack_revoke_command TriggerEvent from a Slack `/trust-revoke` command payload.
 
     Mirrors build_trust_event(): same channel-restriction check, same
     silent-rejection behavior for commands from outside the trusted

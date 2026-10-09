@@ -1,4 +1,4 @@
-"""/trust, /revoke, /trust-status share one rate limit via create_slack_app()'s
+"""/trust, /trust-revoke, /trust-status share one rate limit via create_slack_app()'s
 global slack-bolt middleware (see add-rate-limiting design.md).
 
 Exercises the registered middleware function directly (app._middleware_list[0].func)
@@ -59,7 +59,7 @@ def invoke(middleware, *, user_id, command):
 def test_commands_within_limit_succeed_normally(tmp_path):
     middleware = make_middleware(tmp_path, max_requests=3)
 
-    for command in ("/trust", "/revoke", "/trust-status"):
+    for command in ("/trust", "/trust-revoke", "/trust-status"):
         acked, next_called = invoke(middleware, user_id="U1", command=command)
         assert next_called is True
         assert acked == {}
@@ -80,7 +80,7 @@ def test_limit_is_shared_across_trust_revoke_and_trust_status(tmp_path):
     middleware = make_middleware(tmp_path, max_requests=2)
 
     first_acked, first_next = invoke(middleware, user_id="U1", command="/trust")
-    second_acked, second_next = invoke(middleware, user_id="U1", command="/revoke")
+    second_acked, second_next = invoke(middleware, user_id="U1", command="/trust-revoke")
     third_acked, third_next = invoke(middleware, user_id="U1", command="/trust-status")
 
     assert (first_next, second_next, third_next) == (True, True, False)
