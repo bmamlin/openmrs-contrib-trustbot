@@ -4,7 +4,7 @@
 
 ### Requirement: Webhook signature is verified before any other processing
 **Reason**: Superseded by `discourse-workflow-trigger`'s equivalent
-requirement, which verifies the same `X-Discourse-Workflow-Secret` header
+requirement, which verifies the same `X-Discourse-Workflow-Signature` header
 but is no longer scoped to a single hardcoded workflow name.
 **Migration**: No action needed — the signature scheme and secret
 (`DISCOURSE_WORKFLOW_SECRET`) are unchanged. The existing Discourse

@@ -96,7 +96,7 @@
       403 on failure; call `discourse_webhook.build_event()`, respond
       200 with no action if it returns `None`; else evaluate+execute) →
       else check `X-Discourse-Workflow` header (workflow branch: verify
-      `X-Discourse-Workflow-Secret` against `workflow_secret`, 403 on
+      `X-Discourse-Workflow-Signature` against `workflow_secret`, 403 on
       failure; call `discourse_workflow.build_event()`, 400 if it
       raises `ValueError`; else evaluate+execute) → else 400 (neither
       header present). `create_webhooks_router(...)`'s parameters

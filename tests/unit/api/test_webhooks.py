@@ -69,7 +69,7 @@ def post_webhook(client, body: bytes, *, signature: str | None, event_name: str 
 def post_workflow(client, body: bytes, *, signature: str | None, workflow: str | None = "trusted"):
     headers = {"Content-Type": "application/json"}
     if signature is not None:
-        headers["X-Discourse-Workflow-Secret"] = signature
+        headers["X-Discourse-Workflow-Signature"] = signature
     if workflow is not None:
         headers["X-Discourse-Workflow"] = workflow
     return client.post("/webhook/discourse", content=body, headers=headers)
@@ -299,7 +299,7 @@ def test_rate_limit_keyed_by_first_x_forwarded_for_address():
                 content=body,
                 headers={
                     "Content-Type": "application/json",
-                    "X-Discourse-Workflow-Secret": bad_signature,
+                    "X-Discourse-Workflow-Signature": bad_signature,
                     "X-Discourse-Workflow": "trusted",
                     "X-Forwarded-For": forwarded_for,
                 },
@@ -326,7 +326,7 @@ def test_rate_limit_rejection_logs_warning_with_source_ip(caplog):
                 content=body,
                 headers={
                     "Content-Type": "application/json",
-                    "X-Discourse-Workflow-Secret": sign(body, WORKFLOW_SECRET),
+                    "X-Discourse-Workflow-Signature": sign(body, WORKFLOW_SECRET),
                     "X-Discourse-Workflow": "trusted",
                     "X-Forwarded-For": "203.0.113.77",
                 },
@@ -380,7 +380,7 @@ def test_headers_logged_at_debug_for_rate_limited_request(caplog):
                 content=body,
                 headers={
                     "Content-Type": "application/json",
-                    "X-Discourse-Workflow-Secret": sign(body, WORKFLOW_SECRET),
+                    "X-Discourse-Workflow-Signature": sign(body, WORKFLOW_SECRET),
                     "X-Discourse-Workflow": "trusted",
                 },
             )

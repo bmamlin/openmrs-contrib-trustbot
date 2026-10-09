@@ -160,7 +160,7 @@ If a rule fires but produces no change (e.g. `/trust` is issued for a user who a
       webhook events and Discourse Workflow HTTP action payloads
 - [ ] Verify each request's signature on every incoming request before
       any processing (`X-Discourse-Event-Signature` for native
-      webhooks, `X-Discourse-Workflow-Secret` for Workflows); reject
+      webhooks, `X-Discourse-Workflow-Signature` for Workflows); reject
       unsigned or invalid requests with HTTP 403
 - [ ] Route to a rule by the event/workflow's `name` (from
       `X-Discourse-Event` or `X-Discourse-Workflow`), declared in

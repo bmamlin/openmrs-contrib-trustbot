@@ -57,7 +57,7 @@ headers, which is how this was initially missed); if present, treats
 the request as a native webhook (verify `X-Discourse-Event-Signature`
 against `DISCOURSE_WEBHOOK_SECRET`).
 Otherwise, checks for `X-Discourse-Workflow`; if present, treats it as a
-Workflow request (verify `X-Discourse-Workflow-Secret` against
+Workflow request (verify `X-Discourse-Workflow-Signature` against
 `DISCOURSE_WORKFLOW_SECRET`, unchanged from today). If neither header is
 present: HTTP 400. Real Discourse never sends both, so no explicit
 tie-breaking logic beyond "check native-webhook header first" is needed.

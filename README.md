@@ -133,7 +133,7 @@ config, so any name you choose works as long as a rule references it.
   * A Code step (run before the HTTP request) that computes an
     HMAC-SHA256 signature of the request body, using a secret set as a
     workflow variable, and adds it as a custom header
-    `X-Discourse-Workflow-Secret: sha256=<hex-digest>`. See 
+    `X-Discourse-Workflow-Signature: sha256=<hex-digest>`. See 
     [here](https://meta.discourse.org/t/could-usernames-be-included-in-user-badge-webhook-payload/413448/16?u=burke) 
     for a description.
   * An HTTP request step POSTing to `https://example.ngrok-free.dev/webhook/discourse`
@@ -141,7 +141,7 @@ config, so any name you choose works as long as a rule references it.
     includes at minimum a top-level `username` field (required — this
     is the target OpenMRS ID); include whatever else your rule's
     action needs
-  * A custom header `X-Discourse-Workflow-Secret` with value `{{ $("Code").item.json.signature }}`
+  * A custom header `X-Discourse-Workflow-Signature` with value `{{ $("Code").item.json.signature }}`
   * A custom header `X-Discourse-Workflow` set to a name of your
     choosing (e.g. `trusted`) — this is the `name` your `rules.yaml`
     trigger (`type: workflow, name: "trusted"`) matches against

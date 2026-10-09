@@ -11,7 +11,7 @@ baked into service config and enforced in code.
 
 ### Requirement: Workflow signature is verified before any other processing
 The system SHALL verify a Workflow request's HMAC-SHA256 signature (the
-`X-Discourse-Workflow-Secret` header, in `sha256=<hex-digest>` form,
+`X-Discourse-Workflow-Signature` header, in `sha256=<hex-digest>` form,
 computed over the raw request body using the configured
 `DISCOURSE_WORKFLOW_SECRET`) before taking any other action, including
 before reading the workflow name or parsing the payload. An invalid or

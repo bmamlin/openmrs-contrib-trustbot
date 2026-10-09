@@ -230,7 +230,7 @@ These are never stored in YAML files.
 
 | Variable | Required | Description |
 |---|---|---|
-| `DISCOURSE_WORKFLOW_SECRET` | Yes | Shared secret used to verify every Discourse Workflow's HTTP action signature (`X-Discourse-Workflow-Secret`) — not scoped to one workflow name; which names are acted on is declared in `rules.yaml` |
+| `DISCOURSE_WORKFLOW_SECRET` | Yes | Shared secret used to verify every Discourse Workflow's HTTP action signature (`X-Discourse-Workflow-Signature`) — not scoped to one workflow name; which names are acted on is declared in `rules.yaml` |
 | `DISCOURSE_WEBHOOK_SECRET` | Yes | Shared secret used to verify native Discourse webhook signatures (`X-Discourse-Event-Signature`) — which event types are acted on is declared in `rules.yaml` |
 | `DISCOURSE_API_KEY` | Yes | Discourse API key for read access (used by `/trust-status`) |
 | `DISCOURSE_API_USERNAME` | Yes | Discourse username associated with the API key |

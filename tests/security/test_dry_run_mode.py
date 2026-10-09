@@ -124,7 +124,7 @@ def post_workflow(client: TestClient, body: bytes):
         headers={
             "Content-Type": "application/json",
             "X-Discourse-Workflow": WORKFLOW_NAME,
-            "X-Discourse-Workflow-Secret": sign(body, WORKFLOW_SECRET),
+            "X-Discourse-Workflow-Signature": sign(body, WORKFLOW_SECRET),
         },
     )
 

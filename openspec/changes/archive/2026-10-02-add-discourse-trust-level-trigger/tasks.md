@@ -51,7 +51,7 @@
       webhook_secret, replay_window_seconds, workflow_name, audit_conn) ->
       APIRouter`, mirroring `create_slack_app()`'s factory+context shape
       (a `WebhookContext` dataclass, per design.md); the route reads the
-      raw body first, verifies `X-Discourse-Workflow-Secret` via HMAC-SHA256
+      raw body first, verifies `X-Discourse-Workflow-Signature` via HMAC-SHA256
       with `hmac.compare_digest` (HTTP 403 on failure), then checks
       `X-Discourse-Workflow` against `workflow_name` (HTTP 400 on
       mismatch); verify `tests/unit/api/test_webhooks.py` (new directory)
@@ -97,7 +97,7 @@
 
 - [x] 5.1 Add `tests/security/test_discourse_webhook.py`, mirroring the
       existing Slack security tests' structure: a request with an invalid
-      `X-Discourse-Workflow-Secret` is rejected (403) before any Keycloak
+      `X-Discourse-Workflow-Signature` is rejected (403) before any Keycloak
       or audit call happens, and a validly-signed request with the wrong
       `X-Discourse-Workflow` value is rejected (400) before any
       downstream processing, per the `discourse-trust-level-trigger`

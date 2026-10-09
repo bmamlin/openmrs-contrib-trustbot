@@ -76,7 +76,7 @@ def post_workflow_event(test_client, *, username="jdoe", workflow_name=WORKFLOW_
         headers={
             "Content-Type": "application/json",
             "X-Discourse-Workflow": workflow_name,
-            "X-Discourse-Workflow-Secret": sign(body),
+            "X-Discourse-Workflow-Signature": sign(body),
         },
     )
 

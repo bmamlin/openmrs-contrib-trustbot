@@ -12,7 +12,7 @@ event.
 
 ### Requirement: Webhook signature is verified before any other processing
 The system SHALL verify the webhook request's HMAC-SHA256 signature
-(the `X-Discourse-Workflow-Secret` header, in `sha256=<hex-digest>` form,
+(the `X-Discourse-Workflow-Signature` header, in `sha256=<hex-digest>` form,
 computed over the raw request body using the configured shared secret)
 before taking any other action, including before checking the workflow
 name or parsing the payload.

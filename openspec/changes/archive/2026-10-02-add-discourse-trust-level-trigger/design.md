@@ -59,7 +59,7 @@ In this exact order, matching `specs/discourse-trust-level-trigger/spec.md`:
    re-serialize a parsed payload for signature checking, since
    re-serialization can change byte-for-byte content (whitespace, key
    order) and silently break a valid signature.
-2. Verify `X-Discourse-Workflow-Secret` (`sha256=<hex>` — strip the
+2. Verify `X-Discourse-Workflow-Signature` (`sha256=<hex>` — strip the
    prefix, compute HMAC-SHA256 of the raw body with `webhook_secret`, and
    compare using `hmac.compare_digest` for constant-time comparison). On
    failure: HTTP 403, matching the original (still-valid, unmodified)

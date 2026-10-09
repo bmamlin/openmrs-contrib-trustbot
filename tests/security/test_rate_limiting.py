@@ -122,7 +122,7 @@ def post_workflow(client: TestClient, body: bytes, *, source_ip: str):
         headers={
             "Content-Type": "application/json",
             "X-Discourse-Workflow": WORKFLOW_NAME,
-            "X-Discourse-Workflow-Secret": sign(body, WORKFLOW_SECRET),
+            "X-Discourse-Workflow-Signature": sign(body, WORKFLOW_SECRET),
             "X-Forwarded-For": source_ip,
         },
     )

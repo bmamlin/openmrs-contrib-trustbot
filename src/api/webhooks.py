@@ -23,7 +23,7 @@ distinct delivery mechanisms, branching on which header is present:
 
   Discourse Workflow (X-Discourse-Workflow present, and no
   X-Discourse-Event):
-    1. Verifies X-Discourse-Workflow-Secret (HMAC-SHA256 over the raw
+    1. Verifies X-Discourse-Workflow-Signature (HMAC-SHA256 over the raw
        body, using DISCOURSE_WORKFLOW_SECRET); rejects with HTTP 403.
     2. Parses the JSON body; requires a top-level `username` field.
     3. Builds a `workflow` TriggerEvent (named after the header's
@@ -164,7 +164,7 @@ def create_webhooks_router(
 
         if workflow_name is not None:
             if not _verify_signature(
-                raw_body, request.headers.get("X-Discourse-Workflow-Secret"), context.workflow_secret
+                raw_body, request.headers.get("X-Discourse-Workflow-Signature"), context.workflow_secret
             ):
                 logger.warning("Discourse workflow rejected: invalid signature from %s", source_ip)
                 raise HTTPException(status_code=403, detail="invalid signature")

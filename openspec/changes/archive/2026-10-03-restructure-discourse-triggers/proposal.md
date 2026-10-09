@@ -43,7 +43,7 @@ username directly; the two badge events currently don't — see Impact.)
 - `POST /webhook/discourse` becomes mechanism-agnostic: it branches on
   which header is present, verifies the matching signature scheme
   (`X-Discourse-Event-Signature` + new `DISCOURSE_WEBHOOK_SECRET` for
-  native webhooks; `X-Discourse-Workflow-Secret` + the existing
+  native webhooks; `X-Discourse-Workflow-Signature` + the existing
   `DISCOURSE_WORKFLOW_SECRET` for Workflows, unchanged), and hands off
   to the rules engine using only `type`+`name` — the route no longer
   hardcodes a single accepted name.
@@ -81,7 +81,7 @@ only for the event this service should act on.
   `user_promoted`, `user_badge_granted`, and `user_badge_revoked` event
   types.
 - `discourse-workflow-trigger`: Discourse Workflow signature
-  verification (`X-Discourse-Workflow-Secret`, the existing mechanism),
+  verification (`X-Discourse-Workflow-Signature`, the existing mechanism),
   `type: workflow` trigger matching by workflow name, and the
   `username`-at-top-level payload convention Workflow authors must
   follow.
